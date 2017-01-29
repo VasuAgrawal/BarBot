@@ -4,6 +4,7 @@ import os
 import logging
 import pprint
 import json
+import serial
 
 import tornado
 import tornado.web
@@ -22,6 +23,8 @@ GPIO.setup(LED_PIN, GPIO.OUT)
 led = GPIO.PWM(LED_PIN, 50)
 led.start(0)
 
+ser = serial.Serial('/dev/ttyACM0', 115200)
+
 def map_value(x, from_lo, from_hi, to_lo, to_hi):
     from_range = from_hi - from_lo
     to_range = to_hi - to_lo
@@ -36,7 +39,11 @@ class GamepadHandler(tornado.websocket.WebSocketHandler):
         state = json.loads(message)
         # logging.info("Received message: %s", message)
         # led.ChangeDutyCycle(max(state['axes'][3], 0))
-        led.ChangeDutyCycle(map_value(state['axes'][3], -1, 1, 5, 10))
+        # led.ChangeDutyCycle(map_value(state['axes'][3], -1, 1, 5, 10))
+        value = int(map_value(state['axes'][3], -1, 1, 1300, 1700))
+        logging.info("Writing value %d", value)
+        ser.write((str(value) + '\n').encode('ascii'))
+        # logging.info("From arduino: %s", ser.readline())
 
     def open(self):
         logging.info("Opened websocket connection!")
