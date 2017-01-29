@@ -21,6 +21,11 @@ GPIO.setmode(GPIO.BCM)
 GPIO.setup(LED_PIN, GPIO.OUT)
 led = GPIO.PWM(LED_PIN, 50)
 led.start(0)
+
+def map_value(x, from_lo, from_hi, to_lo, to_hi):
+    from_range = from_hi - from_lo
+    to_range = to_hi - to_lo
+    return (((x - from_lo) / from_range) * to_range) + to_lo
  
 class RootHandler(tornado.web.RequestHandler):
     def get(self):
@@ -30,7 +35,8 @@ class GamepadHandler(tornado.websocket.WebSocketHandler):
     def on_message(self, message):
         state = json.loads(message)
         # logging.info("Received message: %s", message)
-        led.ChangeDutyCycle(max(state['axes'][3], 0))
+        # led.ChangeDutyCycle(max(state['axes'][3], 0))
+        led.ChangeDutyCycle(map_value(state['axes'][3], -1, 1, 5, 10))
 
     def open(self):
         logging.info("Opened websocket connection!")
