@@ -6,24 +6,17 @@ import pprint
 import json
 import serial
 
+import numpy as np
 import tornado
 import tornado.web
 import tornado.websocket
 import tornado.httpserver
 
+# TODO: Search through serial ports, open up the first one.
 try:
-    import RPi.GPIO as GPIO
-except ImportError:
-    import fake_gpio as GPIO
-
-
-LED_PIN = 16
-GPIO.setmode(GPIO.BCM)
-GPIO.setup(LED_PIN, GPIO.OUT)
-led = GPIO.PWM(LED_PIN, 50)
-led.start(0)
-
-ser = serial.Serial('/dev/ttyACM0', 115200)
+    ser = serial.Serial('/dev/ttyACM0', 115200)
+except Exception:
+    ser = None
 
 def map_value(x, from_lo, from_hi, to_lo, to_hi):
     from_range = from_hi - from_lo
@@ -35,15 +28,42 @@ class RootHandler(tornado.web.RequestHandler):
         self.render("static/html/index.html")
 
 class GamepadHandler(tornado.websocket.WebSocketHandler):
+    FORWARD = np.array([1.0, 0.0, 0.0, 1.0])
+    BACKWARD = np.array([0.0, 1.0, 1.0, 0.0])
+    LEFT = np.array([0.0, 0.0, 1.0, 1.0])
+    RIGHT = np.array([1.0, 1.0, 0.0, 0.0])
+    CCW = np.array([0.0, 1.0, 0.0, 1.0])
+    CW = np.array([1.0, 0.0, 1.0, 0.0])
+
     def on_message(self, message):
         state = json.loads(message)
-        # logging.info("Received message: %s", message)
-        # led.ChangeDutyCycle(max(state['axes'][3], 0))
-        # led.ChangeDutyCycle(map_value(state['axes'][3], -1, 1, 5, 10))
-        value = int(map_value(state['axes'][3], -1, 1, 1300, 1700))
-        logging.info("Writing value %d", value)
-        ser.write((str(value) + '\n').encode('ascii'))
-        # logging.info("From arduino: %s", ser.readline())
+        logging.debug("Received message: %s", message)
+
+        axes = state['axes']
+        forward = -min(axes[3], 0)
+        backward = max(axes[3], 0)
+        left = -min(axes[2], 0)
+        right = max(axes[2], 0)
+        ccw = -min(axes[0], 0)
+        cw = max(axes[0], 0)
+
+        outputs = np.minimum(1.0,
+            (self.FORWARD * forward + self.BACKWARD * backward + self.LEFT *
+                left + self.RIGHT * right + self.CCW * ccw + self.CW * cw))
+        logging.debug("Raw outputs: %s", outputs)
+
+        # Map to something that's not full power
+        outputs = map_value(outputs, -1, 1, 1300, 1700)
+        logging.debug("Mapped outputs: %s", outputs)
+
+        out = ','.join(map(lambda x: str(int(x)), outputs)) + '\n'
+        logging.debug("Writing string " + repr(out))
+
+        if (ser):
+            ser.write(out.encode('ascii'))
+        else:
+            logging.info("Writing string " + repr(out))
+
 
     def open(self):
         logging.info("Opened websocket connection!")
@@ -75,7 +95,7 @@ class JoystickServer(tornado.httpserver.HTTPServer):
 
 
 if __name__ == "__main__":
-    logging.getLogger().setLevel(logging.DEBUG)
+    logging.getLogger().setLevel(logging.INFO)
     JoystickServer().listen(8000)
     tornado.ioloop.IOLoop.current().start()
 
