@@ -54,6 +54,9 @@ class GamepadHandler(tornado.websocket.WebSocketHandler):
 
         # Map to something that's not full power
         outputs = map_value(outputs, -1, 1, 1300, 1700)
+        if any(state['buttons']):
+            outputs = np.ones(4) * 1500
+
         logging.debug("Mapped outputs: %s", outputs)
 
         out = ','.join(map(lambda x: str(int(x)), outputs)) + '\n'
@@ -61,6 +64,8 @@ class GamepadHandler(tornado.websocket.WebSocketHandler):
 
         if (ser):
             ser.write(out.encode('ascii'))
+            logging.info("Writing string " + repr(out))
+            logging.info("Read back " + repr(ser.readline()))
         else:
             logging.info("Writing string " + repr(out))
 
