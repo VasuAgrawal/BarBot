@@ -1,6 +1,8 @@
 #include "spi.h"
 #include "constants.h"
 
+#include <stdio.h>
+
 /** 
  * @function readRegister
  * @brief Reads bytes from a register
@@ -12,12 +14,13 @@
  * Does not require more than 1 octet header because this application will
  * not use sub-indexing
  */
-void readRegister(uint8_t channel, uint8_t reg, uint8_t bytes, spi_packet_t* packet) {
+void readRegister(uint8_t channel, uint8_t reg, uint8_t bytes, 
+                  spi_packet_t* packet) {
 	packet->header = 0;
 	packet->header |= reg; // Register to read from
 
     // SPI transaction
-    wiringPiSPIDataRW(channel, packet->header, bytes + 1);
+    wiringPiSPIDataRW(channel, &packet->header, bytes + 1);
 }
 
 /**
@@ -31,13 +34,14 @@ void readRegister(uint8_t channel, uint8_t reg, uint8_t bytes, spi_packet_t* pac
  * Does not require more than 1 octet header because this application will
  * not use sub-indexing
  */
-void writeRegister(uint8_t channel, uint8_t reg, uint8_t bytes, spi_packet_t* packet) {
+void writeRegister(uint8_t channel, uint8_t reg, uint8_t bytes, 
+                   spi_packet_t* packet) {
 	packet->header = 0;
 	packet->header |= reg; // Register to write to
 	packet->header |= DWM_HEADER_WRITE; // Write flag
 
 	// SPI transaction
-	wiringPiSPIDataRW(channel, packet->header, bytes + 1);
+	wiringPiSPIDataRW(channel, &packet->header, bytes + 1);
 }
 
 /**
@@ -53,22 +57,22 @@ void transmitMessage(uint8_t channel, uint8_t bytes, uint8_t* buf) {
 	spi_packet_t tx_message;
 
 	// Configuration information for transmission
-	readRegister(channel, DWM_REG_TX_FCTRL, 5, tx_config);
+	readRegister(channel, DWM_REG_TX_FCTRL, 5, &tx_config);
 	tx_config.message[0] = bytes;
 
 	// Configuration to start transmission
-	readRegister(channel, DWM_REG_SYS_CTRL, 4, tx_start);
+	readRegister(channel, DWM_REG_SYS_CTRL, 4, &tx_start);
 	tx_start.message[0] |= DWM_CTRL_TXSTRT;
 
 	// Load the TX buffer
 	for (int i = 0; i < bytes; i++) {
 		tx_message.message[i] = buf[i];
 	}
-	writeRegister(channel, DWM_REG_TX_BUFFER, bytes, tx_message);
+	writeRegister(channel, DWM_REG_TX_BUFFER, bytes, &tx_message);
 	// Write the TX configuration
-	writeRegister(channel, DWM_REG_TX_FCTRL, 5, tx_config);
+	writeRegister(channel, DWM_REG_TX_FCTRL, 5, &tx_config);
 	// Start the transmission
-	writeRegister(channel, DWM_REG_SYS_CTRL, 4, tx_start);
+	writeRegister(channel, DWM_REG_SYS_CTRL, 4, &tx_start);
 }
 
 /**
@@ -81,7 +85,7 @@ void transmitMessage(uint8_t channel, uint8_t bytes, uint8_t* buf) {
 void receiveMessage(uint8_t channel, uint8_t bytes, uint8_t* buf) {
 	spi_packet_t rx_message;
 
-	readRegister(channel, DWM_REG_RX_BUFFER, bytes, rx_message);
+	readRegister(channel, DWM_REG_RX_BUFFER, bytes, &rx_message);
 
 	for (int i = 0; i < bytes; i++) {
 		buf[i] = rx_message.message[i];

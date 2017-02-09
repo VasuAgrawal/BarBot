@@ -15,7 +15,7 @@ typedef struct spi_packet {
 
 void readRegister(uint8_t channel, uint8_t reg, uint8_t bytes, spi_packet_t* packet);
 void writeRegister(uint8_t channel, uint8_t reg, uint8_t bytes, spi_packet_t* packet);
-void transmitMessage(uint8_t bytes, uint8_t* buf);
-void receiveMessage(uint8_t bytes, uint8_t* buf);
+void transmitMessage(uint8_t channel, uint8_t bytes, uint8_t* buf);
+void receiveMessage(uint8_t channel, uint8_t bytes, uint8_t* buf);
 
 #endif /* _SPI_H_ */

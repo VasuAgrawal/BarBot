@@ -1,54 +1,53 @@
+#include <wiringPi.h>
 #include <wiringPiSPI.h>
 #include <unistd.h>
 #include <stdint.h>
 #include <stdio.h>
+#include <thread>
 
 #include "spi.h"
 #include "constants.h"
 
 using namespace std;
 
-#define SPI_CHANNEL 1
+#define DWM_CHANNEL 0
+#define DWM_INT_PIN 4
 
-int main() {
-    wiringPiSPISetup(SPI_CHANNEL, 500000);
+void DWM_ISR() {
+    printf("Interrupt received\n");
+}
 
-    spi_packet_t test_packet;
-    test_packet.message[0] = 0x11;
-    test_packet.message[1] = 0x12;
-    test_packet.message[2] = 0x13;
-    test_packet.message[3] = 0x14;
-    test_packet.message[4] = 0x15;
-    test_packet.message[5] = 0x16;
-    test_packet.message[6] = 0x17;
-    test_packet.message[7] = 0x18;
-
-    uint8_t counter = 0;
+void txWaitThread() {
+    spi_packet_t status_packet;
 
     while(1) {
-        // Write to the EUI register
-        writeRegister(SPI_CHANNEL, DWM_REG_EUI, 8, test_packet);
-
-        // Read the EUI back from the device
-        sleep(1);
-        readRegister(SPI_CHANNEL, DWM_REG_EUI, 8, test_packet);
-
-        printf("Extended ID: ");
-        for (int i = 0; i < 8; i++) {
-            printf("%2x", test_packet.message[i]);
+        readRegister(DWM_CHANNEL, DWM_REG_SYS_STATUS, 5, &status_packet);
+        if (status_packet.message[0] & DWM_STATUS_TXFRS) {
+            printf("Sent message\n");
+            status_packet.message[0] |= DWM_STATUS_TXFRS; // Clear bit
+            writeRegister(DWM_CHANNEL, DWM_REG_SYS_STATUS, 5, &status_packet);
         }
-        printf("\n");
+    }
+}
 
-        test_packet.message[0] = 0x11 + counter;
-        test_packet.message[1] = 0x12;
-        test_packet.message[2] = 0x13;
-        test_packet.message[3] = 0x14;
-        test_packet.message[4] = 0x15;
-        test_packet.message[5] = 0x16;
-        test_packet.message[6] = 0x17;
-        test_packet.message[7] = 0x18;
-        counter++;
+int main() {
+    // Initialization
+    wiringPiSetup();
+    wiringPiSPISetup(DWM_CHANNEL, 500000);
 
+    // Create thread to check status of transmitted message
+    std::thread txThread(txWaitThread);
+
+    uint8_t buf[6] = {0};
+    buf[0] = 'h';
+    buf[1] = 'e';
+    buf[2] = 'l';
+    buf[3] = 'l';
+    buf[4] = 'o';
+    buf[5] = '\n';
+
+    while(1) {
+        transmitMessage(DWM_CHANNEL, 6, buf);
         sleep(1);
     }
 

@@ -43,10 +43,20 @@
 
 #define DWM_HEADER_WRITE    (1 << 7)
 
-#define DWM_CTRL_TXSTRT     (1 << 1)
-#define DWM_CTRL_WAIT4RESP  (1 << 7)
-#define DWM_CTRL_RXENAB     (1 << 8)
+#define DWM_CFG_RXAUTR      (1 << 6)    // Byte 4
 
-#define DWM_INT_RXDFR       (1 << 13)
+#define DWM_CTRL_TXSTRT     (1 << 1)    // Byte 1
+#define DWM_CTRL_WAIT4RESP  (1 << 7)    // Byte 1
+#define DWM_CTRL_RXENAB     (1 << 1)    // Byte 2
+
+#define DWM_MASK_TXFRB      (1 << 4)    // Byte 1
+#define DWM_MASK_RXDFR      (1 << 6)    // Byte 2
+
+#define DWM_STATUS_TXFRB    (1 << 4)    // Byte 1
+#define DWM_STATUS_TXFRS    (1 << 7)    // Byte 1
+#define DWM_STATUS_RXPRD    (1 << 1)    // Byte 2
+#define DWM_STATUS_RXPHD    (1 << 4)    // Byte 2
+#define DWM_STATUS_RXPHE    (1 << 5)    // Byte 2
+#define DWM_STATUS_RXDFR    (1 << 6)    // Byte 2
 
 #endif /* _CONSTANTS_H_ */
