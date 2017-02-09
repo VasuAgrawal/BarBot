@@ -52,20 +52,23 @@ class GamepadHandler(tornado.websocket.WebSocketHandler):
                 left + self.RIGHT * right + self.CCW * ccw + self.CW * cw))
         logging.debug("Raw outputs: %s", outputs)
 
-        # Map to something that's not full power
-        outputs = map_value(outputs, -1, 1, 1300, 1700)
-        if any(state['buttons']):
+        if state['buttons'][6]:
+            # TURBO
+            outputs = map_value(outputs, -1, 1, 1000, 2000)
+        elif any(state['buttons']):
             outputs = np.ones(4) * 1500
+        else:
+            # Map to something that's not full power
+            outputs = map_value(outputs, -1, 1, 1300, 1700)
 
         logging.debug("Mapped outputs: %s", outputs)
-
         out = ','.join(map(lambda x: str(int(x)), outputs)) + '\n'
         logging.debug("Writing string " + repr(out))
 
         if (ser):
             ser.write(out.encode('ascii'))
-            logging.info("Writing string " + repr(out))
-            logging.info("Read back " + repr(ser.readline()))
+            # logging.info("Writing string " + repr(out))
+            # logging.info("Read back " + repr(ser.readline()))
         else:
             logging.info("Writing string " + repr(out))
 
