@@ -9,4 +9,4 @@ PROGS=$(patsubst %.c,%,$(SRCS))
 all: $(PROGS)
 
 %: %.c
-	$(CC) $< $(DECA) $(CFLAGS) -o $@
+	$(CC) $< $(DECA) $(CFLAGS) -o bin/$@
