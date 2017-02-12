@@ -8,7 +8,7 @@ class Customer(object):
 
     def getPosition(self):
         #use id to get wristband data
-        raise "Not yet implemented"
+        raise Exception("Not yet implemented")
 
     def __repr__(self):
         return "Customer %d" % self.id

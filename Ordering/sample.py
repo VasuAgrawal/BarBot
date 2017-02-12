@@ -15,3 +15,4 @@ queue.enqueue(ord2)
 
 print(queue.dequeue())
 print(queue.dequeue())
+print(queue.dequeue())

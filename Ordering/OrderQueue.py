@@ -7,9 +7,9 @@ class OrderQueue(object):
         self.queue.append(order)
 
     def dequeue(self):
-        if queue.size() > 0:
+        if self.size() > 0:
             return self.queue.pop(0)
-        raise "Cannot dequeue from empty queue"
+        raise Exception("Cannot dequeue from empty queue")
 
     def size(self):
         return len(self.queue)
