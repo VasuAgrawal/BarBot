@@ -33,6 +33,8 @@
 //     __restore_intstate()
 // ---------------------------------------------------------------------------
 
+extern int DECA_MUTEX_FLAG;
+
 
 /*! ------------------------------------------------------------------------------------------------------------------
  * Function: decamutexon()
@@ -50,6 +52,8 @@
  */
 decaIrqStatus_t decamutexon(void)           
 {
+    // Sets the mutex flag so dwt_isr() is not fired
+    DECA_MUTEX_FLAG = 0;
     /*
 	decaIrqStatus_t s = port_GetEXT_IRQStatus();
 
@@ -77,6 +81,8 @@ decaIrqStatus_t decamutexon(void)
  */
 void decamutexoff(decaIrqStatus_t s)        // put a function here that re-enables the interrupt at the end of the critical section
 {
+    // Sets the mutex flag so dwt_isr() is fired again
+    DECA_MUTEX_FLAG = 1;
     /*
 	if(s) { //need to check the port state as we can't use level sensitive interrupt on the STM ARM
 		port_EnableEXT_IRQ();

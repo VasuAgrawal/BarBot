@@ -1,7 +1,10 @@
 CC=g++
-INC=decadriver
-CFLAGS=-I$(INC) -lwiringPi
-DECA=decadriver/deca_device.c decadriver/deca_params_init.c decadriver/deca_spi.c decadriver/deca_sleep.c decadriver/deca_mutex.c
+DECAINC=decadriver
+PLATFORMINC=platform
+CFLAGS=-I$(DECAINC) -I$(PLATFORMINC) -lwiringPi
+
+DECA=decadriver/deca_device.c decadriver/deca_params_init.c
+PLATFORM=platform/raspi_init.c platform/deca_spi.c platform/deca_mutex.c platform/deca_sleep.c
 
 SRCS=$(wildcard *.c)
 PROGS=$(patsubst %.c,%,$(SRCS))
@@ -9,4 +12,4 @@ PROGS=$(patsubst %.c,%,$(SRCS))
 all: $(PROGS)
 
 %: %.c
-	$(CC) $< $(DECA) $(CFLAGS) -o bin/$@
+	$(CC) $< $(DECA) $(PLATFORM) $(CFLAGS) -o bin/$@

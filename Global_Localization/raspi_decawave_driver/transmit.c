@@ -13,9 +13,9 @@
 #include <wiringPi.h>
 #include <wiringPiSPI.h>
 #include <stdio.h>
-
-#include "deca_device_api.h"
-#include "deca_regs.h"
+#include <deca_device_api.h>
+#include <deca_regs.h>
+#include <raspi_init.h>
 
 /* Example application name and version to display on LCD screen. */
 #define APP_NAME "SIMPLE TX v1.2"
@@ -51,8 +51,8 @@ static uint8 tx_msg[] = {0xC5, 0, 'D', 'E', 'C', 'A', 'W', 'A', 'V', 'E', 0, 0};
  */
 int main(void)
 {
-    // Initialize SPI
-    wiringPiSPISetup(0, 500000);
+    // Initialize platform-specific hardware
+    raspiDecawaveInit();
 
     /* Reset and initialise DW1000. See NOTE 2 below.
      * For initialisation, DW1000 clocks must be temporarily set to crystal speed. After initialisation SPI rate can be increased for optimum
