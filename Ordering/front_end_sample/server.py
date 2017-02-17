@@ -13,6 +13,13 @@ class RootHandler(tornado.web.RequestHandler):
     def get(self):
         self.render("static/html/index.html")
 
+class LoginHandler(tornado.web.RequestHandler):
+    def get(self):
+        self.render("static/html/login.html")
+
+class AboutHandler(tornado.web.RequestHandler):
+    def get(self):
+        self.render("static/html/about.html")
 
 class CustomerHandler(tornado.web.RequestHandler):
     @tornado.web.authenticated # Example of authentication
@@ -64,6 +71,8 @@ def main():
         (r"/v0/order/", ApiOrderHandler),
         (r"/v0/robot/", ApiRobotHandler),
         (r"/v0/customer/", ApiCustomerHandler),
+        (r"/login/?", LoginHandler),
+        (r"/about/?", AboutHandler),
     ]
 
     settings = {
