@@ -5,12 +5,17 @@ import json
 import tornado.ioloop
 import tornado.web
 
+class BaseHandler(tornado.web.RequestHandler):
+    def get_current_user(self):
+        return self.get_secure_cookie("user")
+
 class RootHandler(tornado.web.RequestHandler):
     def get(self):
         self.render("static/html/index.html")
 
 
 class CustomerHandler(tornado.web.RequestHandler):
+    @tornado.web.authenticated # Example of authentication
     def get(self):
         print("Doing customer handler!")
         # TODO figure out how to not hard code "static" here
@@ -60,14 +65,16 @@ def main():
         (r"/v0/robot/", ApiRobotHandler),
         (r"/v0/customer/", ApiCustomerHandler),
     ]
-    
-    tornado.web.Application(
-        handlers,
-        static_path="static",
-        debug=True,
-        autoreload=True,
-    ).listen(8888)
 
+    settings = {
+        "static_path": "static",
+        "cookie_secret": "TODO some real cookie secret",
+        "login_url": "/",
+        "debug": True,
+        "autoreload": True,
+    }
+    
+    tornado.web.Application(handlers, **settings).listen(8888)
     tornado.ioloop.IOLoop.current().start()
 
 if __name__ == "__main__":
