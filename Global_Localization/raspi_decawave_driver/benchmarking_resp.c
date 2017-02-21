@@ -1,21 +1,14 @@
-/*! ----------------------------------------------------------------------------
- *  @file    main.c
- *  @brief   Double-sided two-way ranging (DS TWR) responder example code
+/**
+ * Responder for benchmarking Decawave modules.
  *
- *           This is a simple code example which acts as the responder in a DS TWR distance measurement exchange. This application waits for a "poll"
- *           message (recording the RX time-stamp of the poll) expected from the "DS TWR initiator" example code (companion to this application), and
- *           then sends a "response" message recording its TX time-stamp, after which it waits for a "final" message from the initiator to complete
- *           the exchange. The final message contains the remote initiator's time-stamps of poll TX, response RX and final TX. With this data and the
- *           local time-stamps, (of poll RX, response TX and final RX), this example application works out a value for the time-of-flight over-the-air
- *           and, thus, the estimated distance between the two devices, which it writes to the LCD.
+ * The benchmarking code is intended for two beacons to be benchmarked at various
+ * distances, frequencies (channels), and data rates. The command line options allow
+ * selection of channel and data rate.
  *
- * @attention
- *
- * Copyright 2015 (c) Decawave Ltd, Dublin, Ireland.
- *
- * All rights reserved.
- *
- * @author Decawave
+ * The initiator application will constantly initiate ranging exchanges until it is
+ * killed. The corresponding responder application will receive a certain number of
+ * successful distance measurements before terminating. Both applications must be
+ * called with the same command line parameters.
  */
 
 #include <stdio.h>
@@ -25,12 +18,12 @@
 #include <raspi_init.h>
 #include <string.h>
 
-/* Example application name and version to display on LCD screen. */
-#define APP_NAME "DS TWR RESP v1.2"
+/* Number of measurements to read before terminating */
+#define NUM_MEASUREMENTS 100
 
 /* Default communication configuration. We use here EVK1000's default mode (mode 3). */
 static dwt_config_t config = {
-    1,               /* Channel number. */
+    2,               /* Channel number. */
     DWT_PRF_64M,     /* Pulse repetition frequency. */
     DWT_PLEN_1024,   /* Preamble length. Used in TX only. */
     DWT_PAC32,       /* Preamble acquisition chunk size. Used in RX only. */
@@ -99,13 +92,6 @@ static uint64 final_rx_ts;
 static double tof;
 static double distance;
 
-/* String used to display measured distance on LCD screen (16 characters maximum). */
-char dist_str[16] = {0};
-
-/* Data for averaging distance readings */
-static double dist_buf[10] = {0.f};
-static int dist_buf_idx = 0;
-
 /* Declaration of static functions. */
 static uint64 get_tx_timestamp_u64(void);
 static uint64 get_rx_timestamp_u64(void);
@@ -118,18 +104,13 @@ static void final_msg_get_ts(const uint8 *ts_field, uint32 *ts);
  * Returns 0 on success, -1 on failure.
  */
 int computeDistanceResp() {
-    /* Clear reception timeout to start next ranging process. */
-    dwt_setrxtimeout(0);
-
     /* Activate reception immediately. */
     dwt_rxenable(DWT_START_RX_IMMEDIATE);
 
-    /* Poll for reception of a frame or error/timeout. */
+    /* Poll for reception of a frame or error/timeout. See NOTE 8 below. */
     while (!((status_reg = dwt_read32bitreg(SYS_STATUS_ID)) & (SYS_STATUS_RXFCG | SYS_STATUS_ALL_RX_TO | SYS_STATUS_ALL_RX_ERR)));
 
     if (status_reg & SYS_STATUS_RXFCG) {
-        //printf("Received initial\n");
-
         uint32 frame_len;
 
         /* Clear good RX frame event in the DW1000 status register. */
@@ -141,45 +122,35 @@ int computeDistanceResp() {
             dwt_readrxdata(rx_buffer, frame_len, 0);
         }
 
-        /* Check that the frame is a poll sent by the initiator.
+        /* Check that the frame is a poll sent by "DS TWR initiator" example.
          * As the sequence number field of the frame is not relevant, it is cleared to simplify the validation of the frame. */
         rx_buffer[ALL_MSG_SN_IDX] = 0;
         if (memcmp(rx_buffer, rx_poll_msg, ALL_MSG_COMMON_LEN) == 0) {
-            uint32 resp_tx_time;
+            //uint32 resp_tx_time;
             int ret;
 
             /* Retrieve poll reception timestamp. */
             poll_rx_ts = get_rx_timestamp_u64();
             
-            /* Set send time for response. See NOTE 9 below. */
-            //resp_tx_time = (poll_rx_ts + (POLL_RX_TO_RESP_TX_DLY_UUS * UUS_TO_DWT_TIME)) >> 8;
-            //dwt_setdelayedtrxtime(resp_tx_time * 2);
-
-            /* Set expected delay and timeout for final message reception. See NOTE 4 and 5 below. */
-            //dwt_setrxaftertxdelay(RESP_TX_TO_FINAL_RX_DLY_UUS);
-            //dwt_setrxtimeout(FINAL_RX_TIMEOUT_UUS);
-
-            /* Write and send the response message. */
+            /* Write and send the response message. See NOTE 10 below.*/
             tx_resp_msg[ALL_MSG_SN_IDX] = frame_seq_nb;
             dwt_writetxdata(sizeof(tx_resp_msg), tx_resp_msg, 0); /* Zero offset in TX buffer. */
             dwt_writetxfctrl(sizeof(tx_resp_msg), 0, 1); /* Zero offset in TX buffer, ranging. */
-            dwt_starttx(DWT_START_TX_IMMEDIATE | DWT_RESPONSE_EXPECTED);
+            ret = dwt_starttx(DWT_START_TX_IMMEDIATE | DWT_RESPONSE_EXPECTED);
 
+            /* If dwt_starttx() returns an error, abandon this ranging exchange and proceed to the next one. See NOTE 11 below. */
             if (ret == DWT_ERROR) {
-                printf("Error in delayed send\n");
+                printf("Error transmitting response frame\n");
                 return -1;
             }
 
-            //printf("Sent ack\n");
-
-            /* Poll for reception of expected "final" frame or error/timeout. */
+            /* Poll for reception of expected "final" frame or error/timeout. See NOTE 8 below. */
             while (!((status_reg = dwt_read32bitreg(SYS_STATUS_ID)) & (SYS_STATUS_RXFCG | SYS_STATUS_ALL_RX_TO | SYS_STATUS_ALL_RX_ERR)));
 
             /* Increment frame sequence number after transmission of the response message (modulo 256). */
             frame_seq_nb++;
 
             if (status_reg & SYS_STATUS_RXFCG) {
-                printf("Received final\n");
                 /* Clear good RX frame event and TX frame sent in the DW1000 status register. */
                 dwt_write32bitreg(SYS_STATUS_ID, SYS_STATUS_RXFCG | SYS_STATUS_TXFRS);
 
@@ -189,7 +160,7 @@ int computeDistanceResp() {
                     dwt_readrxdata(rx_buffer, frame_len, 0);
                 }
                 
-                /* Check that the frame is a final message sent by the initiator.
+                /* Check that the frame is a final message sent by "DS TWR initiator" example.
                  * As the sequence number field of the frame is not used in this example, it can be zeroed to ease the validation of the frame. */
                 rx_buffer[ALL_MSG_SN_IDX] = 0;
                 if (memcmp(rx_buffer, rx_final_msg, ALL_MSG_COMMON_LEN) == 0) {
@@ -207,7 +178,7 @@ int computeDistanceResp() {
                     final_msg_get_ts(&rx_buffer[FINAL_MSG_RESP_RX_TS_IDX], &resp_rx_ts);
                     final_msg_get_ts(&rx_buffer[FINAL_MSG_FINAL_TX_TS_IDX], &final_tx_ts);
                     
-                    /* Compute time of flight. 32-bit subtractions give correct answers even if clock has wrapped. */
+                    /* Compute time of flight. 32-bit subtractions give correct answers even if clock has wrapped. See NOTE 12 below. */
                     poll_rx_ts_32 = (uint32)poll_rx_ts;
                     resp_tx_ts_32 = (uint32)resp_tx_ts;
                     final_rx_ts_32 = (uint32)final_rx_ts;
@@ -220,35 +191,10 @@ int computeDistanceResp() {
                     tof = tof_dtu * DWT_TIME_UNITS;
                     distance = tof * SPEED_OF_LIGHT;
 
-                    printf("Distance: %3.2f\n", distance);
-                    
-                    /* Send final message as acknowledgment */
-                    /*
-                    dwt_writetxdata(sizeof(tx_resp_msg), tx_resp_msg, 0);
-                    dwt_writetxfctrl(sizeof(tx_resp_msg), 0, 1);
-                    ret = dwt_starttx(DWT_START_TX_IMMEDIATE);
-                    */
-                    //printf("Sent final\n");
-
-
                     return 0;
-                    /*
-                    dist_buf[dist_buf_idx++] = distance;
-                    if (dist_buf_idx == 10) {
-                        // Compute average and print distance
-                        float dist_sum = 0.f;
-                        for (int i = 0; i < 10; i++) {
-                            dist_sum += dist_buf[i];
-                        }
-                        printf("%3.2f\n", dist_sum / 10.0);
-
-                        dist_buf_idx = 0;
-                    }
-                    */
-               }
+                }
             }
             else {
-                //printf("Timeout/error 2\n");
                 /* Clear RX error/timeout events in the DW1000 status register. */
                 dwt_write32bitreg(SYS_STATUS_ID, SYS_STATUS_ALL_RX_TO | SYS_STATUS_ALL_RX_ERR);
 
@@ -258,28 +204,19 @@ int computeDistanceResp() {
         }
     }
     else {
-        //printf("Timeout/error 1\n");
         /* Clear RX error/timeout events in the DW1000 status register. */
         dwt_write32bitreg(SYS_STATUS_ID, SYS_STATUS_ALL_RX_TO | SYS_STATUS_ALL_RX_ERR);
 
         /* Reset RX to properly reinitialise LDE operation. */
         dwt_rxreset();
     }
-
     return -1;
 }
 
-/*! ------------------------------------------------------------------------------------------------------------------
- * @fn main()
- *
- * @brief Application entry point.
- *
- * @param  none
- *
- * @return none
+/**
+ * Application entry point
  */
-int main(int argc, char *argv[])
-{
+int main(int argc, char *argv[]) {
     /* Read command line arguments. */
     if (argc != 3) {
         printf("Usage: [channel: 1, 2, 3, 4, 5, 7] [dataRate: 1, 2, 3]\n");
@@ -344,148 +281,62 @@ int main(int argc, char *argv[])
     dwt_setrxantennadelay(RX_ANT_DLY);
     dwt_settxantennadelay(TX_ANT_DLY);
 
-    /* Set preamble timeout for expected frames. See NOTE 6 below. */
-    dwt_setpreambledetecttimeout(PRE_TIMEOUT);
-
     int successCount = 0;
     int retval;
 
     /* Loop forever responding to ranging requests. */
-    while (1)
-    {
+    while (1) {
         int retval = computeDistanceResp();
         if (retval == 0) {
             successCount++;
             printf("%3.5f\n", distance);
-            if (successCount == 100) {
+            if (successCount == NUM_MEASUREMENTS) {
                 break;
             }
         }
-
-        /*
-        for (int i = 0; i < 50; i++) {
-            computeDistanceResp();
-            printf("%3.5f\n", distance);
-        }
-        
-        config.chan = 2;
-        dwt_forcetrxoff();
-        dwt_configure(&config);
-
-        printf("Channel 2\n");
-        for (int i = 0; i < 10; i++) {
-            computeDistanceResp();
-            printf("%3.5f\n", distance);
-        }
-
-        config.chan = 3;
-        dwt_forcetrxoff();
-        dwt_configure(&config);
-
-        printf("Channel 3\n");
-        for (int i = 0; i < 10; i++) {
-            computeDistanceResp();
-            printf("%3.5f\n", distance);
-        }
-
-        config.chan = 4;
-        dwt_forcetrxoff();
-        dwt_configure(&config);
-
-        printf("Channel 4\n");
-        for (int i = 0; i < 10; i++) {
-            computeDistanceResp();
-            printf("%3.5f\n", distance);
-        }
-
-        config.chan = 5;
-        dwt_forcetrxoff();
-        dwt_configure(&config);
-
-        printf("Channel 5\n");
-        for (int i = 0; i < 10; i++) {
-            computeDistanceResp();
-            printf("%3.5f\n", distance);
-        }
-
-        config.chan = 7;
-        dwt_forcetrxoff();
-        dwt_configure(&config);
-
-        printf("Channel 7\n");
-        for (int i = 0; i < 10; i++) {
-            computeDistanceResp();
-            printf("%3.5f\n", distance);
-        }
-        */
     }
 }
 
-/*! ------------------------------------------------------------------------------------------------------------------
- * @fn get_tx_timestamp_u64()
- *
- * @brief Get the TX time-stamp in a 64-bit variable.
- *        /!\ This function assumes that length of time-stamps is 40 bits, for both TX and RX!
- *
- * @param  none
- *
- * @return  64-bit value of the read time-stamp.
+/**
+ * Get the TX timestamp in a 64-bit variable.
+ * This function assumes that the length of timestamps is 40 bits, for both TX and RX
  */
-static uint64 get_tx_timestamp_u64(void)
-{
+static uint64 get_tx_timestamp_u64(void) {
     uint8 ts_tab[5];
     uint64 ts = 0;
     int i;
     dwt_readtxtimestamp(ts_tab);
-    for (i = 4; i >= 0; i--)
-    {
+    for (i = 4; i >= 0; i--) {
         ts <<= 8;
         ts |= ts_tab[i];
     }
     return ts;
 }
 
-/*! ------------------------------------------------------------------------------------------------------------------
- * @fn get_rx_timestamp_u64()
- *
- * @brief Get the RX time-stamp in a 64-bit variable.
- *        /!\ This function assumes that length of time-stamps is 40 bits, for both TX and RX!
- *
- * @param  none
- *
- * @return  64-bit value of the read time-stamp.
+/**
+ * Get the RX timestamp in a 64-bit variable.
+ * This function assumes that length of timestamps is 40 bits, for both TX and RX
  */
-static uint64 get_rx_timestamp_u64(void)
-{
+static uint64 get_rx_timestamp_u64(void) {
     uint8 ts_tab[5];
     uint64 ts = 0;
     int i;
     dwt_readrxtimestamp(ts_tab);
-    for (i = 4; i >= 0; i--)
-    {
+    for (i = 4; i >= 0; i--) {
         ts <<= 8;
         ts |= ts_tab[i];
     }
     return ts;
 }
 
-/*! ------------------------------------------------------------------------------------------------------------------
- * @fn final_msg_get_ts()
- *
- * @brief Read a given timestamp value from the final message. In the timestamp fields of the final message, the least
- *        significant byte is at the lower address.
- *
- * @param  ts_field  pointer on the first byte of the timestamp field to read
- *         ts  timestamp value
- *
- * @return none
+/**
+ * Fill a given timestamp field in the final message with the given value. In the timestamp fields of the final message,
+ * the least significant byte is at the lower address.
  */
-static void final_msg_get_ts(const uint8 *ts_field, uint32 *ts)
-{
+static void final_msg_get_ts(const uint8 *ts_field, uint32 *ts) {
     int i;
     *ts = 0;
-    for (i = 0; i < FINAL_MSG_TS_LEN; i++)
-    {
+    for (i = 0; i < FINAL_MSG_TS_LEN; i++) {
         *ts += ts_field[i] << (i * 8);
     }
 }
