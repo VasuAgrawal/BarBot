@@ -7,7 +7,8 @@ DECA=decadriver/deca_device.c decadriver/deca_params_init.c
 PLATFORM=platform/raspi_init.c platform/deca_spi.c platform/deca_mutex.c platform/deca_sleep.c
 
 #SRCS=$(wildcard *.c)
-SRCS=beacon_master.c
+#SRCS=beacon_master.c
+SRCS=ranging_init.c
 PROGS=$(patsubst %.c,%,$(SRCS))
 
 all: $(PROGS)

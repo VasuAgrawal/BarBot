@@ -29,7 +29,7 @@
 #define APP_NAME "DS TWR INIT v1.2"
 
 /* Inter-ranging delay period, in milliseconds. */
-#define RNG_DELAY_MS 1000
+#define RNG_DELAY_MS 10
 
 /* Default communication configuration. We use here EVK1000's default mode (mode 3). */
 static dwt_config_t config = {
@@ -83,7 +83,7 @@ static uint32 status_reg = 0;
  * frame length of approximately 2.66 ms with above configuration. */
 #define RESP_RX_TO_FINAL_TX_DLY_UUS 3100
 /* Receive response timeout. See NOTE 5 below. */
-#define RESP_RX_TIMEOUT_UUS 2700
+#define RESP_RX_TIMEOUT_UUS 6000
 /* Preamble timeout, in multiple of PAC size. See NOTE 6 below. */
 #define PRE_TIMEOUT 8
 
@@ -278,7 +278,7 @@ int main(int argc, char *argv[])
 
     /* Set expected response's delay and timeout. See NOTE 4, 5 and 6 below.
      * As this example only handles one incoming frame with always the same delay and timeout, those values can be set here once for all. */
-    dwt_setrxtimeout(RESP_RX_TIMEOUT_UUS);
+    //dwt_setrxtimeout(RESP_RX_TIMEOUT_UUS);
    
     int successCount = 0;
     int retval;
@@ -289,8 +289,8 @@ int main(int argc, char *argv[])
         retval = computeDistanceInit();
         if (retval == 0) {
             successCount++;
-            printf("Finished\n");
-            if (successCount == 10) {
+            //printf("Finished\n");
+            if (successCount == 100) {
                 //break;
             }
         }

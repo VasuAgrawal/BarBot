@@ -172,6 +172,8 @@ int computeDistanceInit() {
 
                 /* Increment frame sequence number after transmission of the final message (modulo 256). */
                 frame_seq_nb++;
+
+                return 0;
             }
         }
     }
@@ -198,7 +200,6 @@ int computeDistanceInit() {
 int main(int argc, char *argv[])
 {
     /* Read command line arguments. */
-    /*
     if (argc != 3) {
         printf("Usage: [channel: 1, 2, 3, 4, 5, 7] [dataRate: 1, 2, 3]\n");
         return -1;
@@ -238,7 +239,6 @@ int main(int argc, char *argv[])
             }
         }
     }
-    */
 
     /* Start with board specific hardware init. */
     raspiDecawaveInit();
@@ -277,9 +277,9 @@ int main(int argc, char *argv[])
         retval = computeDistanceInit();
         if (retval == 0) {
             successCount++;
-            printf("Finished\n");
+            //printf("Finished\n");
             if (successCount == 10) {
-                break;
+                //break;
             }
         }
         deca_sleep(RNG_DELAY_MS);
