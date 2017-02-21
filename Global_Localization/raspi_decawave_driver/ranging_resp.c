@@ -117,7 +117,7 @@ static void final_msg_get_ts(const uint8 *ts_field, uint32 *ts);
  *
  * Returns 0 on success, -1 on failure.
  */
-void computeDistanceResp() {
+int computeDistanceResp() {
     /* Clear reception timeout to start next ranging process. */
     //dwt_setrxtimeout(0);
 
@@ -166,7 +166,7 @@ void computeDistanceResp() {
             /* If dwt_starttx() returns an error, abandon this ranging exchange and proceed to the next one. See NOTE 11 below. */
             if (ret == DWT_ERROR) {
                 printf("Error transmitting response frame\n");
-                return ;
+                return -1;
             }
 
             /* Poll for reception of expected "final" frame or error/timeout. See NOTE 8 below. */
@@ -216,6 +216,9 @@ void computeDistanceResp() {
                     tof = tof_dtu * DWT_TIME_UNITS;
                     distance = tof * SPEED_OF_LIGHT;
 
+                    //printf("%3.2f\n", distance);
+                    return 0;
+
                     dist_buf[dist_buf_idx++] = distance;
                     if (dist_buf_idx == 10) {
                         // Compute average and print distance
@@ -245,6 +248,7 @@ void computeDistanceResp() {
         /* Reset RX to properly reinitialise LDE operation. */
         dwt_rxreset();
     }
+    return -1;
 }
 
 /*! ------------------------------------------------------------------------------------------------------------------
@@ -259,7 +263,6 @@ void computeDistanceResp() {
 int main(int argc, char *argv[])
 {
     /* Read command line arguments. */
-    /*
     if (argc != 3) {
         printf("Usage: [channel: 1, 2, 3, 4, 5, 7] [dataRate: 1, 2, 3]\n");
         return -1;
@@ -299,7 +302,6 @@ int main(int argc, char *argv[])
             }
         }
     }
-    */
 
     /* Start with board specific hardware init. */
     raspiDecawaveInit();
@@ -327,24 +329,20 @@ int main(int argc, char *argv[])
     /* Set preamble timeout for expected frames. See NOTE 6 below. */
     //dwt_setpreambledetecttimeout(PRE_TIMEOUT);
 
-    //int successCount = 0;
-    //int retval;
+    int successCount = 0;
+    int retval;
 
     /* Loop forever responding to ranging requests. */
     while (1)
     {
-        computeDistanceResp();
-        
-        /*
         int retval = computeDistanceResp();
         if (retval == 0) {
             successCount++;
             printf("%3.5f\n", distance);
-            if (successCount == 10) {
+            if (successCount == 100) {
                 break;
             }
         }
-        */
 
         /*
         for (int i = 0; i < 50; i++) {
