@@ -60,6 +60,8 @@ int writetospi(uint16 headerLength, const uint8 *headerBuffer, uint32 bodyLength
 {
     int i;
     
+    decaIrqStatus_t s = decamutexon();
+
     // Construct SPI buffer
     uint8_t spi_buf[headerLength + bodyLength];
     for (i = 0; i < headerLength; i++) {
@@ -71,6 +73,8 @@ int writetospi(uint16 headerLength, const uint8 *headerBuffer, uint32 bodyLength
 
     // Perform SPI transaction
 	wiringPiSPIDataRW(DWM_SPI_CHANNEL, spi_buf, headerLength + bodyLength);
+
+    decamutexoff(s);
 
     return 0;
 }
@@ -93,6 +97,8 @@ int readfromspi(uint16 headerLength, const uint8 *headerBuffer, uint32 readLengt
 {
     int i;
     
+    decaIrqStatus_t s = decamutexon();
+
     // Construct SPI buffer
     uint8_t spi_buf[headerLength + readLength];
     for (i = 0; i < headerLength; i++) {
@@ -106,6 +112,8 @@ int readfromspi(uint16 headerLength, const uint8 *headerBuffer, uint32 readLengt
     for (i = 0; i < readLength; i++) {
         readBuffer[i] = spi_buf[i + headerLength];
     }
+
+    decamutexoff(s);
 
     return 0;
 }

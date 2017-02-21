@@ -13,9 +13,9 @@
 #include <wiringPi.h>
 #include <wiringPiSPI.h>
 #include <stdio.h>
-
-#include "deca_device_api.h"
-#include "deca_regs.h"
+#include <deca_device_api.h>
+#include <deca_regs.h>
+#include <raspi_init.h>
 
 /* Example application name and version to display on LCD screen. */
 #define APP_NAME "SIMPLE RX v1.2"
@@ -50,12 +50,9 @@ static uint16 frame_len = 0;
 int main(void)
 {
     // Initialize SPI
-    wiringPiSPISetup(0, 500000);
+    raspiDecawaveInit();
 
-    /* Reset and initialise DW1000. See NOTE 2 below.
-     * For initialisation, DW1000 clocks must be temporarily set to crystal speed. After initialisation SPI rate can be increased for optimum
-     * performance. */
-    //reset_DW1000(); /* Target specific drive of RSTn line into DW1000 low for a period. */
+    /* Initialize */
     if (dwt_initialise(DWT_LOADNONE) == DWT_ERROR)
     {
         printf("DWM1000: Initialization Failed!\n");
@@ -71,26 +68,10 @@ int main(void)
     int deviceId = dwt_readdevid();
     printf("DWM1000: Device ID %x\n", deviceId);
 
-    /*
-    //spi_set_rate_low();
-    if (dwt_initialise(DWT_LOADNONE) == DWT_ERROR)
-    {
-        lcd_display_str("INIT FAILED");
-        while (1)
-        { };
-    }
-    spi_set_rate_high();
-
-    // Configure DW1000.
-    dwt_configure(&config);
-    */
-
     /* Loop forever receiving frames. */
     while (1)
     {
         int i;
-
-        /* TESTING BREAKPOINT LOCATION #1 */
 
         /* Clear local RX buffer to avoid having leftovers from previous receptions  This is not necessary but is included here to aid reading
          * the RX buffer.
