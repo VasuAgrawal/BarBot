@@ -24,6 +24,7 @@
 #include <deca_device_api.h>
 #include <deca_regs.h>
 #include <raspi_init.h>
+#include <string.h>
 
 /* Example application name and version to display on LCD screen. */
 #define APP_NAME "DS TWR INIT v1.2"
@@ -227,7 +228,7 @@ int main(void)
         }
 
         /* Execute a delay between ranging exchanges. */
-        sleep_ms(RNG_DELAY_MS);
+        deca_sleep(RNG_DELAY_MS);
     }
 }
 

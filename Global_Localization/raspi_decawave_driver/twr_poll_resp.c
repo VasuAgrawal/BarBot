@@ -24,6 +24,7 @@
 #include <deca_device_api.h>
 #include <deca_regs.h>
 #include <raspi_init.h>
+#include <string.h>
 
 /* Example application name and version to display on LCD screen. */
 #define APP_NAME "DS TWR RESP v1.2"
@@ -254,8 +255,7 @@ int main(void)
                         distance = tof * SPEED_OF_LIGHT;
 
                         /* Display computed distance on LCD. */
-                        sprintf(dist_str, "DIST: %3.2f m", distance);
-                        lcd_display_str(dist_str);
+                        printf("DIST: %3.2f m", distance);
                     }
                 }
                 else

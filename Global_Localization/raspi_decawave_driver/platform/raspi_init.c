@@ -25,6 +25,7 @@ int DECA_MUTEX_FLAG;
  * @brief Interrupt handler for the Decawave chip
  */
 void DECAWAVE_RPI_ISR() {
+    printf("isr\n");
     if (DECA_MUTEX_FLAG == 1) {
         dwt_isr();
     }

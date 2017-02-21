@@ -67,7 +67,7 @@ void rxGoodISR(const dwt_cb_data_t *cbData) {
      * the RX buffer.
      * This is a good place to put a breakpoint. Here (after first time through the loop) the local status register will be set for last event
      * and if a good receive has happened the data buffer will have the data in it, and frame_len will be set to the length of the RX frame. */
-    for (i = 0 ; i < FRAME_LEN_MAX; i++ )
+    for (int i = 0 ; i < FRAME_LEN_MAX; i++ )
     {
         rx_buffer[i] = 0;
     }
@@ -101,7 +101,7 @@ int main(void)
     printf("DWM1000: Device ID %x\n", deviceId);
 
     /* Set up interrupt handlers */
-    dwt_setcallbacks(NULL, rxGoodIST, NULL, rxErrorISR);
+    dwt_setcallbacks(NULL, rxGoodISR, NULL, rxErrorISR);
 
     /* Activate reception immediately. See NOTE 3 below. */
     dwt_rxenable(DWT_START_RX_IMMEDIATE);

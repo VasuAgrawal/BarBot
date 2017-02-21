@@ -16,6 +16,7 @@
 #include <deca_device_api.h>
 #include <deca_regs.h>
 #include <raspi_init.h>
+#include <thread>
 
 /* Example application name and version to display on LCD screen. */
 #define APP_NAME "SIMPLE TX v1.2"
@@ -52,6 +53,25 @@ void txDoneISR(const dwt_cb_data_t *cbData) {
     dwt_write32bitreg(SYS_STATUS_ID, SYS_STATUS_TXFRS);
 }
 
+void sendPeriodicMessages() {
+    /* Loop forever sending frames periodically. */
+    while(1)
+    {
+        /* Write frame data to DW1000 and prepare transmission. See NOTE 4 below.*/
+        dwt_writetxdata(sizeof(tx_msg), tx_msg, 0); /* Zero offset in TX buffer. */
+        dwt_writetxfctrl(sizeof(tx_msg), 0, 0); /* Zero offset in TX buffer, no ranging. */
+
+        /* Start transmission. */
+        dwt_starttx(DWT_START_TX_IMMEDIATE);
+
+        /* Execute a delay between transmissions. */
+        deca_sleep(TX_DELAY_MS);
+
+        /* Increment the blink frame sequence number (modulo 256). */
+        tx_msg[BLINK_FRAME_SN_IDX]++;
+    }
+}
+
 /**
  * Application entry point.
  */
@@ -79,22 +99,13 @@ int main(void)
     int deviceId = dwt_readdevid();
     printf("DWM1000: Device ID %x\n", deviceId);
 
+    /* Set up interrupts */
+    dwt_setinterrupt(DWT_INT_TFRS, 1);
+    dwt_setcallbacks(txDoneISR, NULL, NULL, NULL);
+
     /* Loop forever sending frames periodically. */
-    while(1)
-    {
-        /* Write frame data to DW1000 and prepare transmission. See NOTE 4 below.*/
-        dwt_writetxdata(sizeof(tx_msg), tx_msg, 0); /* Zero offset in TX buffer. */
-        dwt_writetxfctrl(sizeof(tx_msg), 0, 0); /* Zero offset in TX buffer, no ranging. */
-
-        /* Start transmission. */
-        dwt_starttx(DWT_START_TX_IMMEDIATE);
-
-        /* Execute a delay between transmissions. */
-        deca_sleep(TX_DELAY_MS);
-
-        /* Increment the blink frame sequence number (modulo 256). */
-        tx_msg[BLINK_FRAME_SN_IDX]++;
-    }
+    std::thread txThread(sendPeriodicMessages);
+    txThread.join();
 }
 
 /*****************************************************************************************************************************************************
