@@ -74,9 +74,9 @@ static uint32 status_reg = 0;
 #define POLL_TX_TO_RESP_RX_DLY_UUS 150
 /* This is the delay from Frame RX timestamp to TX reply timestamp used for calculating/setting the DW1000's delayed TX function. This includes the
  * frame length of approximately 2.66 ms with above configuration. */
-#define RESP_RX_TO_FINAL_TX_DLY_UUS 3100
+#define RESP_RX_TO_FINAL_TX_DLY_UUS 9000
 /* Receive response timeout. See NOTE 5 below. */
-#define RESP_RX_TIMEOUT_UUS 5400
+#define RESP_RX_TIMEOUT_UUS 10800
 /* Preamble timeout, in multiple of PAC size. See NOTE 6 below. */
 #define PRE_TIMEOUT 8
 
@@ -115,6 +115,7 @@ int computeDistanceInit() {
     frame_seq_nb++;
 
     if (status_reg & SYS_STATUS_RXFCG) {
+        //printf("Rx ack\n");
         uint32 frame_len;
 
         /* Clear good RX frame event and TX frame sent in the DW1000 status register. */
@@ -130,6 +131,7 @@ int computeDistanceInit() {
          * As the sequence number field of the frame is not relevant, it is cleared to simplify the validation of the frame. */
         rx_buffer[ALL_MSG_SN_IDX] = 0;
         if (memcmp(rx_buffer, rx_resp_msg, ALL_MSG_COMMON_LEN) == 0) {
+            //printf("Validate ack\n");
             uint32 final_tx_time;
             int ret;
 
@@ -160,6 +162,8 @@ int computeDistanceInit() {
                 /* Poll DW1000 until TX frame sent event set. See NOTE 9 below. */
                 while (!(dwt_read32bitreg(SYS_STATUS_ID) & SYS_STATUS_TXFRS));
 
+                //printf("Finished sending final\n");
+
                 /* Clear TXFRS event. */
                 dwt_write32bitreg(SYS_STATUS_ID, SYS_STATUS_TXFRS);
 
@@ -167,6 +171,9 @@ int computeDistanceInit() {
                 frame_seq_nb++;
 
                 return 0;
+            }
+            else {
+                //printf("Error sending final\n");
             }
         }
     }

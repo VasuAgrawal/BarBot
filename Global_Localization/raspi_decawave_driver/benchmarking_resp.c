@@ -111,6 +111,7 @@ int computeDistanceResp() {
     while (!((status_reg = dwt_read32bitreg(SYS_STATUS_ID)) & (SYS_STATUS_RXFCG | SYS_STATUS_ALL_RX_TO | SYS_STATUS_ALL_RX_ERR)));
 
     if (status_reg & SYS_STATUS_RXFCG) {
+        //printf("Rx init\n");
         uint32 frame_len;
 
         /* Clear good RX frame event in the DW1000 status register. */
@@ -126,6 +127,7 @@ int computeDistanceResp() {
          * As the sequence number field of the frame is not relevant, it is cleared to simplify the validation of the frame. */
         rx_buffer[ALL_MSG_SN_IDX] = 0;
         if (memcmp(rx_buffer, rx_poll_msg, ALL_MSG_COMMON_LEN) == 0) {
+            //printf("Validate init\n");
             //uint32 resp_tx_time;
             int ret;
 
@@ -140,9 +142,10 @@ int computeDistanceResp() {
 
             /* If dwt_starttx() returns an error, abandon this ranging exchange and proceed to the next one. See NOTE 11 below. */
             if (ret == DWT_ERROR) {
-                printf("Error transmitting response frame\n");
+                printf("Error transmitting response\n");
                 return -1;
             }
+            //printf("Tx response\n");
 
             /* Poll for reception of expected "final" frame or error/timeout. See NOTE 8 below. */
             while (!((status_reg = dwt_read32bitreg(SYS_STATUS_ID)) & (SYS_STATUS_RXFCG | SYS_STATUS_ALL_RX_TO | SYS_STATUS_ALL_RX_ERR)));
@@ -151,6 +154,7 @@ int computeDistanceResp() {
             frame_seq_nb++;
 
             if (status_reg & SYS_STATUS_RXFCG) {
+                //printf("Rx final\n");
                 /* Clear good RX frame event and TX frame sent in the DW1000 status register. */
                 dwt_write32bitreg(SYS_STATUS_ID, SYS_STATUS_RXFCG | SYS_STATUS_TXFRS);
 
@@ -164,6 +168,7 @@ int computeDistanceResp() {
                  * As the sequence number field of the frame is not used in this example, it can be zeroed to ease the validation of the frame. */
                 rx_buffer[ALL_MSG_SN_IDX] = 0;
                 if (memcmp(rx_buffer, rx_final_msg, ALL_MSG_COMMON_LEN) == 0) {
+                    //printf("Validate final\n");
                     uint32 poll_tx_ts, resp_rx_ts, final_tx_ts;
                     uint32 poll_rx_ts_32, resp_tx_ts_32, final_rx_ts_32;
                     double Ra, Rb, Da, Db;
@@ -291,7 +296,7 @@ int main(int argc, char *argv[]) {
             successCount++;
             printf("%3.5f\n", distance);
             if (successCount == NUM_MEASUREMENTS) {
-                break;
+                //break;
             }
         }
     }
