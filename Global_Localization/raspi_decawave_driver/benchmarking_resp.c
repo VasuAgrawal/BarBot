@@ -19,7 +19,7 @@
 #include <string.h>
 
 /* Number of measurements to read before terminating */
-#define NUM_MEASUREMENTS 100
+#define NUM_MEASUREMENTS 2500
 
 /* Default communication configuration. We use here EVK1000's default mode (mode 3). */
 static dwt_config_t config = {
