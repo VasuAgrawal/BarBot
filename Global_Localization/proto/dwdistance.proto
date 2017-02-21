@@ -1,9 +1,8 @@
 syntax = "proto3";
 
-import "google/protobuf/timestamp.proto";
-
 message DwDistance {
-    google.protobuf.Timestamp time = 1;
+    reserved 1;
+    reserved timestamp;
     uint32 send_id = 2;
     uint32 recv_id = 3;
     double dist = 4;
