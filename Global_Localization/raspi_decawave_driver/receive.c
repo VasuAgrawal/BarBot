@@ -44,6 +44,11 @@ static uint32 status_reg = 0;
 /* Hold copy of frame length of frame received (if good) so that it can be examined at a debug breakpoint. */
 static uint16 frame_len = 0;
 
+typedef unsigned long long uint64;
+
+static uint64 get_tx_timestamp_u64(void);
+static uint64 get_rx_timestamp_u64(void);
+
 /**
  * Application entry point.
  */
@@ -93,7 +98,12 @@ int main(void)
 
         if (status_reg & SYS_STATUS_RXFCG)
         {
+
+            uint64 rx_ts = get_rx_timestamp_u64();
+
             printf("Frame received\n");
+            printf("Timestamp: %llu\n", rx_ts);
+
             /* A frame has been received, copy it to our local buffer. */
             frame_len = dwt_read32bitreg(RX_FINFO_ID) & RX_FINFO_RXFL_MASK_1023;
             if (frame_len <= FRAME_LEN_MAX)
@@ -111,6 +121,61 @@ int main(void)
         }
     }
 }
+
+/*! ------------------------------------------------------------------------------------------------------------------
+ * @fn get_tx_timestamp_u64()
+ *
+ * @brief Get the TX time-stamp in a 64-bit variable.
+ *        /!\ This function assumes that length of time-stamps is 40 bits, for both TX and RX!
+ *
+ * @param  none
+ *
+ * @return  64-bit value of the read time-stamp.
+ */
+static uint64 get_tx_timestamp_u64(void)
+{
+    uint8 ts_tab[5];
+    uint64 ts = 0;
+    int i;
+    dwt_readtxtimestamp(ts_tab);
+    printf("tx buf: ");
+    for (i = 4; i >= 0; i--)
+    {
+        printf("|%d", ts_tab[i]);
+        ts <<= 8;
+        ts |= ts_tab[i];
+    }
+    printf("|\n");
+    return ts;
+}
+
+/*! ------------------------------------------------------------------------------------------------------------------
+ * @fn get_rx_timestamp_u64()
+ *
+ * @brief Get the RX time-stamp in a 64-bit variable.
+ *        /!\ This function assumes that length of time-stamps is 40 bits, for both TX and RX!
+ *
+ * @param  none
+ *
+ * @return  64-bit value of the read time-stamp.
+ */
+static uint64 get_rx_timestamp_u64(void)
+{
+    uint8 ts_tab[5];
+    uint64 ts = 0;
+    int i;
+    dwt_readrxtimestamp(ts_tab);
+    printf("rx buf: ");
+    for (i = 4; i >= 0; i--)
+    {
+        printf("|%d", ts_tab[i]);
+        ts <<= 8;
+        ts |= ts_tab[i];
+    }
+    printf("|\n");
+    return ts;
+}
+
 
 /*****************************************************************************************************************************************************
  * NOTES:

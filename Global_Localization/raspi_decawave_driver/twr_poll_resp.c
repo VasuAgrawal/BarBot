@@ -123,7 +123,7 @@ int main(void)
     raspiDecawaveInit();
 
     /* Initialize */
-    if (dwt_initialise(DWT_LOADNONE) == DWT_ERROR)
+    if (dwt_initialise(DWT_LOADUCODE) == DWT_ERROR)
     {
         printf("DWM1000: Initialization Failed!\n");
         while (1)
@@ -143,7 +143,7 @@ int main(void)
     dwt_settxantennadelay(TX_ANT_DLY);
 
     /* Set preamble timeout for expected frames. See NOTE 6 below. */
-    dwt_setpreambledetecttimeout(PRE_TIMEOUT);
+    //dwt_setpreambledetecttimeout(PRE_TIMEOUT);
 
     /* Loop forever responding to ranging requests. */
     while (1)
@@ -183,19 +183,22 @@ int main(void)
                 /* Retrieve poll reception timestamp. */
                 poll_rx_ts = get_rx_timestamp_u64();
 
+                printf("---------------------------------\n");
+                printf("msg1_rx: %llu\n", poll_rx_ts);
+
                 /* Set send time for response. See NOTE 9 below. */
                 resp_tx_time = (poll_rx_ts + (POLL_RX_TO_RESP_TX_DLY_UUS * UUS_TO_DWT_TIME)) >> 8;
-                dwt_setdelayedtrxtime(resp_tx_time);
+                //dwt_setdelayedtrxtime(resp_tx_time * 2);
 
                 /* Set expected delay and timeout for final message reception. See NOTE 4 and 5 below. */
-                dwt_setrxaftertxdelay(RESP_TX_TO_FINAL_RX_DLY_UUS);
-                dwt_setrxtimeout(FINAL_RX_TIMEOUT_UUS);
+                //dwt_setrxaftertxdelay(RESP_TX_TO_FINAL_RX_DLY_UUS);
+                //dwt_setrxtimeout(FINAL_RX_TIMEOUT_UUS);
 
                 /* Write and send the response message. See NOTE 10 below.*/
                 tx_resp_msg[ALL_MSG_SN_IDX] = frame_seq_nb;
                 dwt_writetxdata(sizeof(tx_resp_msg), tx_resp_msg, 0); /* Zero offset in TX buffer. */
                 dwt_writetxfctrl(sizeof(tx_resp_msg), 0, 1); /* Zero offset in TX buffer, ranging. */
-                ret = dwt_starttx(DWT_START_TX_DELAYED | DWT_RESPONSE_EXPECTED);
+                ret = dwt_starttx(DWT_START_TX_IMMEDIATE | DWT_RESPONSE_EXPECTED);
 
                 /* If dwt_starttx() returns an error, abandon this ranging exchange and proceed to the next one. See NOTE 11 below. */
                 if (ret == DWT_ERROR)
@@ -221,7 +224,7 @@ int main(void)
                     {
                         dwt_readrxdata(rx_buffer, frame_len, 0);
                     }
-
+                    
                     /* Check that the frame is a final message sent by "DS TWR initiator" example.
                      * As the sequence number field of the frame is not used in this example, it can be zeroed to ease the validation of the frame. */
                     rx_buffer[ALL_MSG_SN_IDX] = 0;
@@ -241,6 +244,9 @@ int main(void)
                         final_msg_get_ts(&rx_buffer[FINAL_MSG_RESP_RX_TS_IDX], &resp_rx_ts);
                         final_msg_get_ts(&rx_buffer[FINAL_MSG_FINAL_TX_TS_IDX], &final_tx_ts);
 
+                        printf("msg2_tx: %llu\n", resp_tx_ts);
+                        printf("msg3_rx: %llu\n", final_rx_ts);
+
                         /* Compute time of flight. 32-bit subtractions give correct answers even if clock has wrapped. See NOTE 12 below. */
                         poll_rx_ts_32 = (uint32)poll_rx_ts;
                         resp_tx_ts_32 = (uint32)resp_tx_ts;
@@ -255,7 +261,7 @@ int main(void)
                         distance = tof * SPEED_OF_LIGHT;
 
                         /* Display computed distance on LCD. */
-                        printf("DIST: %3.2f m", distance);
+                        printf("DIST: %3.2f m\n", distance);
                     }
                 }
                 else
