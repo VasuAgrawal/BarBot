@@ -153,11 +153,13 @@ int main(void)
         dwt_starttx(DWT_START_TX_IMMEDIATE | DWT_RESPONSE_EXPECTED);
 
         /* Wait until message is sent */
+        /*
         while (!(dwt_read32bitreg(SYS_STATUS_ID) & SYS_STATUS_TXFRS));
 
         printf("---------------------------------\n");
         uint64 tx1_ts = get_tx_timestamp_u64();
         printf("devA TX1: %llu\n", tx1_ts);
+        */
 
         /* We assume that the transmission is achieved correctly, poll for reception of a frame or error/timeout. See NOTE 9 below. */
         while (!((status_reg = dwt_read32bitreg(SYS_STATUS_ID)) & (SYS_STATUS_RXFCG | SYS_STATUS_ALL_RX_TO | SYS_STATUS_ALL_RX_ERR)))
@@ -168,6 +170,11 @@ int main(void)
 
         if (status_reg & SYS_STATUS_RXFCG)
         {
+            /*
+            uint64 rx_ts = get_rx_timestamp_u64();
+            printf("devA RX: %llu\n", rx_ts);
+            */
+
             uint32 frame_len;
 
             /* Clear good RX frame event and TX frame sent in the DW1000 status register. */
@@ -208,14 +215,15 @@ int main(void)
                 tx_final_msg[ALL_MSG_SN_IDX] = frame_seq_nb;
                 dwt_writetxdata(sizeof(tx_final_msg), tx_final_msg, 0); /* Zero offset in TX buffer. */
                 dwt_writetxfctrl(sizeof(tx_final_msg), 0, 1); /* Zero offset in TX buffer, ranging. */
-                ret = dwt_starttx(DWT_START_TX_IMMEDIATE);
+                ret = dwt_starttx(DWT_START_TX_DELAYED);
 
                 /* Wait until message is sent */
+                /*
                 while (!(dwt_read32bitreg(SYS_STATUS_ID) & SYS_STATUS_TXFRS));
 
                 uint64 tx1_ts = get_tx_timestamp_u64();
                 printf("devA TX2: %llu\n", tx1_ts);
-
+                *
 
                 /* If dwt_starttx() returns an error, abandon this ranging exchange and proceed to the next one. See NOTE 12 below. */
                 if (ret == DWT_SUCCESS)
@@ -229,6 +237,12 @@ int main(void)
 
                     /* Increment frame sequence number after transmission of the final message (modulo 256). */
                     frame_seq_nb++;
+
+                    printf("Sent final message. Transaction complete\n");
+                }
+                else
+                {
+                    printf("Delayed transmit error\n");
                 }
             }
         }
