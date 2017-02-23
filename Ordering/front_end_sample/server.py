@@ -17,17 +17,25 @@ class LoginHandler(tornado.web.RequestHandler):
     def get(self):
         self.render("static/html/login.html")
 
+class LogoutHandler(tornado.web.RequestHandler):
+    def get(self):
+        self.redirect("/")
+
 class AboutHandler(tornado.web.RequestHandler):
     def get(self):
         self.render("static/html/about.html")
 
 class CustomerHandler(tornado.web.RequestHandler):
-    @tornado.web.authenticated # Example of authentication
+    #@tornado.web.authenticated # Example of authentication
     def get(self):
         print("Doing customer handler!")
         # TODO figure out how to not hard code "static" here
         self.render("static/html/customer.html")
 
+    def post(self):
+        print("got post request!")
+        print(self.get_argument("Email"), self.get_argument("Password"))
+        self.redirect("/customer/")
 
 class BartenderHandler(tornado.web.RequestHandler):
     def get(self):
@@ -47,6 +55,11 @@ class ApiDrinkHandler(tornado.web.RequestHandler):
 class ApiOrderHandler(tornado.web.RequestHandler):
     def get(self):
         self.write(json.dumps({"order1": "some order"}))
+
+    def post(self):
+        print("Beer:", self.get_argument("beer-checkbox", default=None))
+        print("Wine:", self.get_argument("wine-checkbox", default=None))
+        self.redirect("/customer/")
 
 
 class ApiRobotHandler(tornado.web.RequestHandler):
@@ -73,6 +86,7 @@ def main():
         (r"/v0/customer/", ApiCustomerHandler),
         (r"/login/?", LoginHandler),
         (r"/about/?", AboutHandler),
+        (r"/logout/?", LogoutHandler)
     ]
 
     settings = {

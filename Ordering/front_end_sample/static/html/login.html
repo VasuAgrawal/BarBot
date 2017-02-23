@@ -60,14 +60,14 @@
                         <h2 class="mdl-card__title-text">Login</h2>
                     </div>
                     <div class="mdl-card__supporting-text">
-                        <form action="#" class="">
+                        <form action="/customer/" method="post" class="">
                             <div class="mdl-textfield mdl-js-textfield mdl-textfield--floating-label">
-                                <input class="mdl-textfield__input" pattern="[A-Z,a-z]*@[A-Z,a-z]*.[A-Z,a-z]*" type="text" id="Email">
-                                <label class="mdl-textfield__label" for="Name">Email...</label>
+                                <input class="mdl-textfield__input" pattern="[A-Z,a-z,0-9]*@[A-Z,a-z,0-9]*.[A-Z,a-z,0-9]*" type="text" id="Email" name="Email">
+                                <label class="mdl-textfield__label" for="Email">Email...</label>
                             </div>
                             <div class="mdl-textfield mdl-js-textfield mdl-textfield--floating-label">
-                                <input class="mdl-textfield__input" type="text" id="Password">
-                                <label class="mdl-textfield__label" for="Email">Password...</label>
+                                <input class="mdl-textfield__input" type="password" id="Password" name="Password">
+                                <label class="mdl-textfield__label" for="Password">Password...</label>
                             </div>
                             <p>
                                 <button class="mdl-button mdl-js-button mdl-button--raised mdl-js-ripple-effect mdl-button--accent" type="submit">
