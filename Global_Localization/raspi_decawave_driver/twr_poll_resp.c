@@ -181,9 +181,9 @@ int main(void)
                 int ret;
 
                 /* Retrieve poll reception timestamp. */
-                /*
                 poll_rx_ts = get_rx_timestamp_u64();
-
+                
+                /*
                 printf("---------------------------------\n");
                 printf("msg1_rx: %llu\n", poll_rx_ts);
                 */
