@@ -115,7 +115,7 @@ int main(void)
     raspiDecawaveInit();
 
     /* Initialize */
-    if (dwt_initialise(DWT_LOADNONE) == DWT_ERROR)
+    if (dwt_initialise(DWT_LOADUCODE) == DWT_ERROR)
     {
         printf("DWM1000: Initialization Failed!\n");
         while (1)
@@ -200,7 +200,7 @@ int main(void)
                 resp_rx_ts = get_rx_timestamp_u64();
 
                 /* Compute final message transmission time. See NOTE 10 below. */
-                final_tx_time = (resp_rx_ts + (RESP_RX_TO_FINAL_TX_DLY_UUS * UUS_TO_DWT_TIME)) >> 8;
+                final_tx_time = (resp_rx_ts + (2*RESP_RX_TO_FINAL_TX_DLY_UUS * UUS_TO_DWT_TIME)) >> 8;
                 dwt_setdelayedtrxtime(final_tx_time);
 
                 /* Final TX timestamp is the transmission time we programmed plus the TX antenna delay. */
