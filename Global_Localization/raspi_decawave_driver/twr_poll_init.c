@@ -136,9 +136,9 @@ int main(void)
 
     /* Set expected response's delay and timeout. See NOTE 4, 5 and 6 below.
      * As this example only handles one incoming frame with always the same delay and timeout, those values can be set here once for all. */
-    dwt_setrxaftertxdelay(POLL_TX_TO_RESP_RX_DLY_UUS);
-    dwt_setrxtimeout(RESP_RX_TIMEOUT_UUS);
-    dwt_setpreambledetecttimeout(PRE_TIMEOUT);
+    //dwt_setrxaftertxdelay(POLL_TX_TO_RESP_RX_DLY_UUS);
+    //dwt_setrxtimeout(RESP_RX_TIMEOUT_UUS);
+    //dwt_setpreambledetecttimeout(PRE_TIMEOUT);
 
     /* Loop forever initiating ranging exchanges. */
     while (1)
@@ -151,6 +151,13 @@ int main(void)
         /* Start transmission, indicating that a response is expected so that reception is enabled automatically after the frame is sent and the delay
          * set by dwt_setrxaftertxdelay() has elapsed. */
         dwt_starttx(DWT_START_TX_IMMEDIATE | DWT_RESPONSE_EXPECTED);
+
+        /* Wait until message is sent */
+        while (!(dwt_read32bitreg(SYS_STATUS_ID) & SYS_STATUS_TXFRS));
+
+        printf("---------------------------------\n");
+        uint64 tx1_ts = get_tx_timestamp_u64();
+        printf("devA TX1: %llu\n", tx1_ts);
 
         /* We assume that the transmission is achieved correctly, poll for reception of a frame or error/timeout. See NOTE 9 below. */
         while (!((status_reg = dwt_read32bitreg(SYS_STATUS_ID)) & (SYS_STATUS_RXFCG | SYS_STATUS_ALL_RX_TO | SYS_STATUS_ALL_RX_ERR)))
@@ -201,7 +208,14 @@ int main(void)
                 tx_final_msg[ALL_MSG_SN_IDX] = frame_seq_nb;
                 dwt_writetxdata(sizeof(tx_final_msg), tx_final_msg, 0); /* Zero offset in TX buffer. */
                 dwt_writetxfctrl(sizeof(tx_final_msg), 0, 1); /* Zero offset in TX buffer, ranging. */
-                ret = dwt_starttx(DWT_START_TX_DELAYED);
+                ret = dwt_starttx(DWT_START_TX_IMMEDIATE);
+
+                /* Wait until message is sent */
+                while (!(dwt_read32bitreg(SYS_STATUS_ID) & SYS_STATUS_TXFRS));
+
+                uint64 tx1_ts = get_tx_timestamp_u64();
+                printf("devA TX2: %llu\n", tx1_ts);
+
 
                 /* If dwt_starttx() returns an error, abandon this ranging exchange and proceed to the next one. See NOTE 12 below. */
                 if (ret == DWT_SUCCESS)

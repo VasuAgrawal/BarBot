@@ -46,6 +46,11 @@ static uint8 tx_msg[] = {0xC5, 0, 'D', 'E', 'C', 'A', 'W', 'A', 'V', 'E', 0, 0};
 /* Inter-frame delay period, in milliseconds. */
 #define TX_DELAY_MS 1000
 
+typedef unsigned long long uint64;
+
+static uint64 get_tx_timestamp_u64(void);
+static uint64 get_rx_timestamp_u64(void);
+
 /**
  * Application entry point.
  */
@@ -89,7 +94,10 @@ int main(void)
         while (!(dwt_read32bitreg(SYS_STATUS_ID) & SYS_STATUS_TXFRS))
         { };
 
+        uint64 tx_ts = get_tx_timestamp_u64();
+
         printf("Sent message\n");
+        printf("Timestamp: %llu\n", tx_ts);
 
         /* Clear TX frame sent event. */
         dwt_write32bitreg(SYS_STATUS_ID, SYS_STATUS_TXFRS);
@@ -101,6 +109,61 @@ int main(void)
         tx_msg[BLINK_FRAME_SN_IDX]++;
     }
 }
+
+/*! ------------------------------------------------------------------------------------------------------------------
+ * @fn get_tx_timestamp_u64()
+ *
+ * @brief Get the TX time-stamp in a 64-bit variable.
+ *        /!\ This function assumes that length of time-stamps is 40 bits, for both TX and RX!
+ *
+ * @param  none
+ *
+ * @return  64-bit value of the read time-stamp.
+ */
+static uint64 get_tx_timestamp_u64(void)
+{
+    uint8 ts_tab[5];
+    uint64 ts = 0;
+    int i;
+    dwt_readtxtimestamp(ts_tab);
+    printf("tx buf: ");
+    for (i = 4; i >= 0; i--)
+    {
+        printf("|%d", ts_tab[i]);
+        ts <<= 8;
+        ts |= ts_tab[i];
+    }
+    printf("|\n");
+    return ts;
+}
+
+/*! ------------------------------------------------------------------------------------------------------------------
+ * @fn get_rx_timestamp_u64()
+ *
+ * @brief Get the RX time-stamp in a 64-bit variable.
+ *        /!\ This function assumes that length of time-stamps is 40 bits, for both TX and RX!
+ *
+ * @param  none
+ *
+ * @return  64-bit value of the read time-stamp.
+ */
+static uint64 get_rx_timestamp_u64(void)
+{
+    uint8 ts_tab[5];
+    uint64 ts = 0;
+    int i;
+    dwt_readrxtimestamp(ts_tab);
+    printf("rx buf: ");
+    for (i = 4; i >= 0; i--)
+    {
+        printf("|%d", ts_tab[i]);
+        ts <<= 8;
+        ts |= ts_tab[i];
+    }
+    printf("|\n");
+    return ts;
+}
+
 
 /*****************************************************************************************************************************************************
  * NOTES:
