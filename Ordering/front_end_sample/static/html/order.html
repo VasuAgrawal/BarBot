@@ -1,0 +1,13 @@
+<form action="/bartender/" method="post">
+    <input type="hidden" name="orderId" value="{{ order.id }}"/>
+    <tr class="order" id="m{{ order.id }}">
+      <td>{% module linkify(str(order.id)) %}</td>
+      <td class="mdl-data-table__cell--non-numeric">{% module linkify(order.orderType) %}</td>
+      <td>{% module linkify(str(order.robot)) %}</td>
+      <td>
+        <button class="mdl-button mdl-js-button mdl-button--raised mdl-js-ripple-effect mdl-button--accent" type="submit">
+            Finish
+        </button>
+      </td>
+    </tr>
+</form>

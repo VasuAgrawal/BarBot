@@ -16,7 +16,7 @@ class Application(tornado.web.Application):
         handlers = [
             (r"/", MainHandler),
             (r"/chatsocket", ChatSocketHandler),
-            (r"/bartendersocket", BartenderSocketHandler)
+            #(r"/bartendersocket", BartenderSocketHandler)
         ]
         settings = dict(
             template_path=os.path.join(os.path.dirname(__file__), "templates"),

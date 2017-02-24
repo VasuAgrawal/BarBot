@@ -69,33 +69,9 @@
                                 </tr>
                               </thead>
                               <tbody>
-                                <tr>
-                                  <td class="mdl-data-table__cell--non-numeric">
-                                    <label class="mdl-checkbox mdl-js-checkbox mdl-js-ripple-effect" for="beer-checkbox">
-                                        <input type="checkbox" id="beer-checkbox" class="mdl-checkbox__input" name="beer-checkbox">
-                                        <span class="mdl-checkbox__label">Beer</span>
-                                    </label>
-                                  </td>
-                                  <td>$3</td>
-                                </tr>
-                                <tr>
-                                  <td class="mdl-data-table__cell--non-numeric">
-                                    <label class="mdl-checkbox mdl-js-checkbox mdl-js-ripple-effect" for="wine-checkbox">
-                                        <input type="checkbox" id="wine-checkbox" class="mdl-checkbox__input" name="wine-checkbox">
-                                        <span class="mdl-checkbox__label">Wine</span>
-                                    </label>
-                                  </td>
-                                  <td>$5</td>
-                                </tr>
-                                <tr>
-                                  <td class="mdl-data-table__cell--non-numeric">
-                                    <label class="mdl-checkbox mdl-js-checkbox mdl-js-ripple-effect" for="margarita-checkbox">
-                                        <input type="checkbox" id="margarita-checkbox" class="mdl-checkbox__input" name="margarita-checkbox">
-                                        <span class="mdl-checkbox__label">Margarita</span>
-                                    </label>
-                                  </td>
-                                  <td>$7</td>
-                                </tr>
+                                {% for drink in drinks %}
+                                    {% include 'drink.html' %}
+                                {% end %}
                               </tbody>
                             </table>
 

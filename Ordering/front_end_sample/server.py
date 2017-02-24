@@ -2,8 +2,14 @@
 import logging
 import json
 
+from Order import Order
+from Drink import Drink
+
 import tornado.ioloop
 import tornado.web
+
+orders = []
+drinks = [Drink("Beer", 3), Drink("Wine", 4)]
 
 class BaseHandler(tornado.web.RequestHandler):
     def get_current_user(self):
@@ -30,7 +36,7 @@ class CustomerHandler(tornado.web.RequestHandler):
     def get(self):
         print("Doing customer handler!")
         # TODO figure out how to not hard code "static" here
-        self.render("static/html/customer.html")
+        self.render("static/html/customer.html", drinks=drinks)
 
     def post(self):
         print("got post request!")
@@ -40,7 +46,18 @@ class CustomerHandler(tornado.web.RequestHandler):
 class BartenderHandler(tornado.web.RequestHandler):
     def get(self):
         # TODO figure out how to not hard code "static" here
-        self.render("static/html/bartender.html")
+        self.render("static/html/bartender.html", orders=orders)
+
+    def post(self):
+        print("got a bartender post request")
+        id = int(self.get_argument("orderId"))
+        print("removing order %d" % id)
+        for order in orders:
+            if order.id == id:
+                orders.remove(order)
+                break
+        self.redirect("/bartender/")
+
 
 
 class ApiDrinkHandler(tornado.web.RequestHandler):
@@ -57,8 +74,9 @@ class ApiOrderHandler(tornado.web.RequestHandler):
         self.write(json.dumps({"order1": "some order"}))
 
     def post(self):
-        print("Beer:", self.get_argument("beer-checkbox", default=None))
-        print("Wine:", self.get_argument("wine-checkbox", default=None))
+        for drink in drinks:
+            if self.get_argument(drink.type + "-checkbox", default=None) != None:
+                orders.append(Order("Bob", drink.type, 0))
         self.redirect("/customer/")
 
 
@@ -86,7 +104,7 @@ def main():
         (r"/v0/customer/", ApiCustomerHandler),
         (r"/login/?", LoginHandler),
         (r"/about/?", AboutHandler),
-        (r"/logout/?", LogoutHandler)
+        (r"/logout/?", LogoutHandler),
     ]
 
     settings = {
