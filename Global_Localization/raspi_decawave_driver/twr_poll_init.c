@@ -30,7 +30,7 @@
 #define APP_NAME "DS TWR INIT v1.2"
 
 /* Inter-ranging delay period, in milliseconds. */
-#define RNG_DELAY_MS 1000
+#define RNG_DELAY_MS 100
 
 /* Default communication configuration. We use here EVK1000's default mode (mode 3). */
 static dwt_config_t config = {
@@ -223,7 +223,7 @@ int main(void)
 
                 uint64 tx1_ts = get_tx_timestamp_u64();
                 printf("devA TX2: %llu\n", tx1_ts);
-                *
+                */
 
                 /* If dwt_starttx() returns an error, abandon this ranging exchange and proceed to the next one. See NOTE 12 below. */
                 if (ret == DWT_SUCCESS)
@@ -238,7 +238,7 @@ int main(void)
                     /* Increment frame sequence number after transmission of the final message (modulo 256). */
                     frame_seq_nb++;
 
-                    printf("Sent final message. Transaction complete\n");
+                    //printf("Sent final message. Transaction complete\n");
                 }
                 else
                 {
