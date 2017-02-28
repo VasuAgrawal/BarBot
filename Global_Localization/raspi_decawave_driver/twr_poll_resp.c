@@ -103,6 +103,10 @@ static double distance;
 /* String used to display measured distance on LCD screen (16 characters maximum). */
 char dist_str[16] = {0};
 
+/* Data for averaging distance readings */
+static double dist_buf[10] = {0.f};
+static int dist_buf_idx = 0;
+
 /* Declaration of static functions. */
 static uint64 get_tx_timestamp_u64(void);
 static uint64 get_rx_timestamp_u64(void);
@@ -246,7 +250,8 @@ int main(void)
                         final_msg_get_ts(&rx_buffer[FINAL_MSG_POLL_TX_TS_IDX], &poll_tx_ts);
                         final_msg_get_ts(&rx_buffer[FINAL_MSG_RESP_RX_TS_IDX], &resp_rx_ts);
                         final_msg_get_ts(&rx_buffer[FINAL_MSG_FINAL_TX_TS_IDX], &final_tx_ts);
-
+                        
+                        /*
                         printf("---------------------------------------------------------------------");
                         printf("Init device timestamps:\n");
                         printf("Tx1: %llu\n", poll_tx_ts);
@@ -256,6 +261,7 @@ int main(void)
                         printf("Rx1: %llu\n", poll_rx_ts);
                         printf("Tx: %llu\n", resp_tx_ts);
                         printf("Rx2: %llu\n", final_rx_ts);
+                        */
 
                         /* Compute time of flight. 32-bit subtractions give correct answers even if clock has wrapped. See NOTE 12 below. */
                         poll_rx_ts_32 = (uint32)poll_rx_ts;
@@ -270,8 +276,20 @@ int main(void)
                         tof = tof_dtu * DWT_TIME_UNITS;
                         distance = tof * SPEED_OF_LIGHT;
 
+                        dist_buf[dist_buf_idx++] = distance;
+                        if (dist_buf_idx == 10) {
+                            // Compute average and print distance
+                            float dist_sum = 0.f;
+                            for (int i = 0; i < 10; i++) {
+                                dist_sum += dist_buf[i];
+                            }
+                            printf("DIST: %3.2f m\n", dist_sum / 10.0);
+
+                            dist_buf_idx = 0;
+                        }
+
                         /* Display computed distance on LCD. */
-                        printf("DIST: %3.2f m\n", distance);
+                        //printf("DIST: %3.2f m\n", distance);
                     }
                 }
                 else
