@@ -5,6 +5,7 @@ import json
 from Order import Order
 from Drink import Drink
 
+import tornado.gen
 import tornado.ioloop
 import tornado.web
 import momoko
@@ -98,14 +99,32 @@ class ApiCustomerHandler(PostgresHandler):
     def get(self):
         self.write(json.dumps({"customer": "customer data"}))
 
+class UserHandler(PostgresHandler):
+
+    @tornado.gen.coroutine
+    def get(self, id=None):
+        if not id:
+            sql = """
+                SELECT id, username, email, password
+                FROM users;
+            """
+            cursor = yield self.db().execute(sql)
+            desc = cursor.description
+            result = [dict(zip([col[0] for col in desc], row)) for row in cursor.fetchall()]
+            cursor.close()
+
+            self.write(json.dumps(result))
+            self.finish()
+
 class BatBotApplication(tornado.web.Application):
-    def __init__(self):
+    def __init__(self, ioloop):
         logging.info("Starting logging!")
         logging.root.setLevel(logging.DEBUG)
 
         handlers = [
             #TODO tune these regex
             (r"/?", RootHandler),
+            (r"/user/?", UserHandler),
             (r"/customer/?", CustomerHandler),
             (r"/bartender/?", BartenderHandler),
             (r"/v0/drink/", ApiDrinkHandler),
@@ -126,19 +145,27 @@ class BatBotApplication(tornado.web.Application):
         }
 
         tornado.web.Application.__init__(self, handlers, **settings)
-        dsn = 'dbname=barbotdb user=barbotdev password=drinks ' \
+
+        dsn = 'dbname=barbotdb user=barbotdev password=icanswim ' \
                   'host=localhost port=5432'
 
-        self.db = momoko.Pool(dsn=dsn, size=1)
+        self.db = momoko.Pool(dsn=dsn, size=1, ioloop=ioloop)
         self.orders = []
         self.drinks = [Drink("Beer", 3), Drink("Wine", 4)]
 
 
 
 def main():
-    app = BatBotApplication()
+    ioloop = tornado.ioloop.IOLoop.instance()
+    app = BatBotApplication(ioloop)
+    
+    dbConnection = app.db.connect()
+    ioloop.add_future(dbConnection, lambda f: ioloop.stop())
+    ioloop.start()
+    dbConnection.result()
+
     app.listen(8888)
-    tornado.ioloop.IOLoop.current().start()
+    ioloop.start()
 
 if __name__ == "__main__":
     main()
