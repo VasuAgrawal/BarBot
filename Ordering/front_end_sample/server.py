@@ -9,9 +9,6 @@ import tornado.ioloop
 import tornado.web
 import momoko
 
-orders = []
-drinks = [Drink("Beer", 3), Drink("Wine", 4)]
-
 class PostgresHandler(tornado.web.RequestHandler):
     def prepare(self):
         if self.request.headers.get("Content-Type") == "application/json":
@@ -48,7 +45,7 @@ class CustomerHandler(PostgresHandler):
     def get(self):
         print("Doing customer handler!")
         # TODO figure out how to not hard code "static" here
-        self.render("static/html/customer.html", drinks=drinks)
+        self.render("static/html/customer.html", drinks=self.drinks)
 
     def post(self):
         print("got post request!")
@@ -58,15 +55,15 @@ class CustomerHandler(PostgresHandler):
 class BartenderHandler(PostgresHandler):
     def get(self):
         # TODO figure out how to not hard code "static" here
-        self.render("static/html/bartender.html", orders=orders)
+        self.render("static/html/bartender.html", orders=self.orders)
 
     def post(self):
         print("got a bartender post request")
         id = int(self.get_argument("orderId"))
         print("removing order %d" % id)
-        for order in orders:
+        for order in self.orders:
             if order.id == id:
-                orders.remove(order)
+                self.orders.remove(order)
                 break
         self.redirect("/bartender/")
 
@@ -86,9 +83,9 @@ class ApiOrderHandler(PostgresHandler):
         self.write(json.dumps({"order1": "some order"}))
 
     def post(self):
-        for drink in drinks:
+        for drink in self.drinks:
             if self.get_argument(drink.type + "-checkbox", default=None) != None:
-                orders.append(Order("Bob", drink.type, 0))
+                self.orders.append(Order("Bob", drink.type, 0))
         self.redirect("/customer/")
 
 
@@ -133,11 +130,12 @@ class BatBotApplication(tornado.web.Application):
                   'host=localhost port=5432'
 
         self.db = momoko.Pool(dsn=dsn, size=1)
+        self.orders = []
+        self.drinks = [Drink("Beer", 3), Drink("Wine", 4)]
 
 
 
 def main():
-    
     app = BatBotApplication()
     app.listen(8888)
     tornado.ioloop.IOLoop.current().start()
