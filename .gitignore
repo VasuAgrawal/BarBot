@@ -1,3 +1,4 @@
 Global_Localization/raspi_decawave_driver/bin
 *.swp
+*.pyc
 __pycache__
