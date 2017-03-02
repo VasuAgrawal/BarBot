@@ -35,51 +35,65 @@
             <div class="mdl-layout__header-row portfolio-logo-row">
                 <span class="mdl-layout__title">
                     <div class="portfolio-logo"></div>
-                    <span class="mdl-layout__title">BarBot</span>
+                <span class="mdl-layout__title">BarBot</span>
                 </span>
             </div>
             <div class="mdl-layout__header-row portfolio-navigation-row mdl-layout--large-screen-only">
                 <nav class="mdl-navigation mdl-typography--body-1-force-preferred-font">
-                    <a class="mdl-navigation__link" href="/">Home</a>
-                    <a class="mdl-navigation__link is-active" href="/about/">About</a>
+                    <a class="mdl-navigation__link is-active" href="/bartender/">Home</a>
+                    <a class="mdl-navigation__link" href="/logout/">Logout</a>
+                    <a class="mdl-navigation__link" href="/about/">About</a>
                 </nav>
             </div>
         </header>
         <div class="mdl-layout__drawer mdl-layout--small-screen-only">
             <nav class="mdl-navigation mdl-typography--body-1-force-preferred-font">
-                <a class="mdl-navigation__link is-active" href="/">Home</a>
+                <a class="mdl-navigation__link is-active" href="/bartender/">Home</a>
+                <a class="mdl-navigation__link" href="/logout/">Logout</a>
                 <a class="mdl-navigation__link" href="/about/">About</a>
             </nav>
         </div>
         <main class="mdl-layout__content">
-            <div class="mdl-grid portfolio-max-width">
-
+            <div class="mdl-grid portfolio-max-width portfolio-contact">
                 <div class="mdl-cell mdl-cell--12-col mdl-card mdl-shadow--4dp">
                     <div class="mdl-card__title">
-                        <h2 class="mdl-card__title-text">About</h2>
+                        <h2 class="mdl-card__title-text">Current Menu</h2>
                     </div>
-
-                    <div class="mdl-grid portfolio-copy">
-                        <h3 class="mdl-cell mdl-cell--12-col mdl-typography--headline">Introduction</h3>
-                        <div class="mdl-cell mdl-cell--8-col mdl-card__supporting-text no-padding ">
-                            <p>
-                                It's a robot that brings you drinks! Wow!
-                            </p>
-                        </div>
-                    </div>
-
-                    <div class="mdl-grid portfolio-copy">
-                        <h3 class="mdl-cell mdl-cell--12-col mdl-typography--headline">The Team</h3>
-                        <div class="mdl-cell mdl-cell--8-col mdl-card__supporting-text no-padding ">
-                            <div>Kim Kleiven (kkleiven@andrew.cmu.edu)</div>
-                            <div>Tommy Lau (kunfungl@andrew.cmu.edu)</div>
-                            <div>Vasu Agrawal (vasua@andrew.cmu.edu)</div>
-                            <div>Vivek Sridhar (viveksri@andrew.cmu.edu)</div>
-                        </div>
+                    <div class="mdl-card__supporting-text">
+                        <table class="mdl-data-table mdl-js-data-table mdl-shadow--2dp">
+                          <thead>
+                            <tr>
+                              <th class="mdl-data-table__cell--non-numeric">Drink</th>
+                              <th class="mdl-data-table__cell--non-numeric">Price</th>
+                              <th class="mdl-data-table__cell--non-numeric"></th>
+                              <th></th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                          {% for drink in drinks %}
+                            {% include 'item.html' %}
+                          {% end %}
+                          </tbody>
+                        </table>
                     </div>
                 </div>
-
-
+            </div>
+            <div class="mdl-card__supporting-text">
+                <form action="/menu/" method="post" class="">
+                    <div class="mdl-textfield mdl-js-textfield mdl-textfield--floating-label">
+                        <input class="mdl-textfield__input" type="text" id="drinkType" name="drinkType">
+                        <label class="mdl-textfield__label" for="drinkType">Drink</label>
+                    </div>
+                    <div class="mdl-textfield mdl-js-textfield mdl-textfield--floating-label">
+                        <input class="mdl-textfield__input" type="number" step="0.01" id="price" name="price">
+                        <label class="mdl-textfield__label" for="price">Price</label>
+                    </div>
+                    <div class="mdl-textfield mdl-js-textfield mdl-textfield--floating-label">
+                        <button class="mdl-button mdl-js-button mdl-button--raised mdl-js-ripple-effect mdl-button--accent" type="submit">
+                            Add
+                        </button>
+                    </div>
+                </form>
             </div>
             <footer class="mdl-mini-footer">
                 <div class="mdl-mini-footer__left-section">

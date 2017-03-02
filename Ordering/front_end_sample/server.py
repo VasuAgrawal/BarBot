@@ -4,6 +4,7 @@ import json
 
 from Order import Order
 from Drink import Drink
+from datetime import datetime
 
 import tornado.gen
 import tornado.ioloop
@@ -27,16 +28,19 @@ class PostgresHandler(tornado.web.RequestHandler):
         else:
             return None
 
-
-class BaseHandler(PostgresHandler):
-    def get_current_user(self):
-        return self.get_secure_cookie("user")
-
 class RootHandler(PostgresHandler):
     def get(self):
-        self.render("static/html/index.html")
+        user = self.get_current_user()
+        if(user):
+            if(user in self.application.bartender):
+                self.redirect("/bartender/")
+            else:
+                self.redirect("/customer/")
+        else:
+            self.redirect("/login/")
 
 class LoginHandler(PostgresHandler):
+    @tornado.gen.coroutine
     def get(self):
         self.render("static/html/login.html")
 
@@ -44,8 +48,6 @@ class LoginHandler(PostgresHandler):
     def post(self):
         email = str(self.get_argument("Email"))
         password = str(self.get_argument("Password"))
-        print("received log in request")
-        print(email, password)
         sql = """
                 SELECT id, name, email
                 FROM users
@@ -67,7 +69,27 @@ class LoginHandler(PostgresHandler):
             print(self.get_current_user())
             self.redirect("/")
 
-        #self.redirect("/")
+class RegisterHandler(PostgresHandler):
+    @tornado.gen.coroutine
+    def get(self):
+        self.render("static/html/register.html")
+
+    @tornado.gen.coroutine
+    def post(self):
+        name = str(self.get_argument("Name"))
+        email = str(self.get_argument("Email"))
+        password = str(self.get_argument("Password"))
+        if(len(name) > 0 and len(email) > 0 and len(password) > 0):
+            sql = """
+                    INSERT INTO users(name, email, password)
+                    VALUES(%s, %s, %s)
+                """
+            cursor = yield self.db().execute(sql, (name, email,password,))
+            self.redirect("/")
+        else:
+            self.write("Register Fail")
+            self.finish()
+
 
 class LogoutHandler(PostgresHandler):
     def get(self):
@@ -79,32 +101,107 @@ class AboutHandler(PostgresHandler):
     def get(self):
         self.render("static/html/about.html")
 
+
 class CustomerHandler(PostgresHandler):
     @tornado.web.authenticated # Example of authentication
+    @tornado.gen.coroutine
     def get(self):
-        print("Doing customer handler!")
-        # TODO figure out how to not hard code "static" here
-        self.render("static/html/customer.html", drinks={})
+        sql = """
+                SELECT id, name, price
+                FROM drinks
+            """
+        cursor = yield self.db().execute(sql)
+        desc = cursor.description
+        result = [dict(zip([col[0] for col in desc], row)) for row in cursor.fetchall()]
 
+        drinks = []
+        for item in result:
+            drink = Drink(item['id'], item['name'], item['price'])
+            drinks.append(drink)
+        self.render("static/html/customer.html", drinks=drinks)
+
+class MenuHandler(PostgresHandler):
+    @tornado.web.authenticated
+    @tornado.gen.coroutine
     def post(self):
-        print("got post request!")
-        print(self.get_argument("Email"), self.get_argument("Password"))
-        self.redirect("/customer/")
+        user = self.get_current_user()
+        if(user not in self.application.bartender):
+            self.redirect("/")
+        else:
+            id = self.get_argument("drinkId", default=None)
+            if(id):
+                id = int(id)
+                sql = """
+                        DELETE FROM drinks WHERE id = %s;
+                    """
+                cursor = yield self.db().execute(sql, (id, ))
+                self.redirect("/bartender/")
+            drinkType = self.get_argument("drinkType", default=None)
+            price = self.get_argument("price", default=None)
+            if(drinkType and price):
+                drinkType = str(drinkType)
+                price = float(price)
+                sql = """ INSERT INTO drinks(name, price)
+                          VALUES(%s, %s)
+                    """
+                cursor = yield self.db().execute(sql, (drinkType, price))
+                self.redirect("/")
+
 
 class BartenderHandler(PostgresHandler):
+    @tornado.gen.coroutine
     def get(self):
-        # TODO figure out how to not hard code "static" here
-        self.render("static/html/bartender.html", orders=self.orders)
+        user = self.get_current_user()
+        if(user not in self.application.bartender):
+            self.redirect("/")
+        else:
+            drinks = []
+            orders = []
 
+            drink_sql = """
+                    SELECT id, name, price
+                    FROM drinks
+                """
+            drink_cursor = yield self.db().execute(drink_sql)
+            drink_desc = drink_cursor.description
+            drink_result = [dict(zip([col[0] for col in drink_desc], row)) for row in drink_cursor.fetchall()]
+
+            for item in drink_result:
+                drink = Drink(item['id'], item['name'], item['price'])
+                drinks.append(drink)
+
+            order_sql = """
+                    SELECT id, user_id, drink_id, completed, time
+                    FROM orders
+                    WHERE completed = FALSE
+                """
+            order_cursor = yield self.db().execute(order_sql)
+            drink_desc = order_cursor.description
+            order_result = [dict(zip([col[0] for col in drink_desc], row)) for row in order_cursor.fetchall()]
+
+            for item in order_result:
+                drinkId = item['drink_id']
+                drinkName = ""
+                for drink in drinks:
+                    if(drink.id == drinkId):
+                        drinkName = drink.type
+                order = Order(item['id'], item['user_id'], drinkId, drinkName, item['time'])
+                orders.append(order)
+            self.render("static/html/bartender.html", orders=orders, drinks=drinks)
+
+    @tornado.gen.coroutine
     def post(self):
-        print("got a bartender post request")
-        id = int(self.get_argument("orderId"))
-        print("removing order %d" % id)
-        for order in self.orders:
-            if order.id == id:
-                self.orders.remove(order)
-                break
-        self.redirect("/bartender/")
+        id = self.get_argument("orderId", default=None)
+        if(id):
+            id = int(id)
+            sql = """
+                UPDATE orders
+                SET completed=%s
+                WHERE id=%s;
+            """
+            cursor = yield self.db().execute(sql, (True, id))
+
+        self.redirect("/")
 
 
 
@@ -118,14 +215,22 @@ class ApiDrinkHandler(PostgresHandler):
 
 
 class ApiOrderHandler(PostgresHandler):
-    def get(self):
-        self.write(json.dumps({"order1": "some order"}))
-
+    @tornado.web.authenticated
+    @tornado.gen.coroutine
     def post(self):
-        for drink in self.drinks:
-            if self.get_argument(drink.type + "-checkbox", default=None) != None:
-                self.orders.append(Order("Bob", drink.type, 0))
-        self.redirect("/customer/")
+        drink_id = self.get_argument("drinkId", default = None)
+        if(drink_id):
+            dt = datetime.now()
+            drink_id = int(drink_id)
+            sql ="""
+                INSERT INTO orders(user_id, drink_id, completed, time, quantity)
+                VALUES (%s, %s, FALSE, %s, 1)
+                """
+            order_cursor = yield self.db().execute(sql, (self.get_current_user(), drink_id, dt))
+            self.redirect("/about/")
+        else:
+            self.write("Order Failed!")
+            self.finish()
 
 
 class ApiRobotHandler(PostgresHandler):
@@ -180,7 +285,6 @@ class SetUpHandler(PostgresHandler):
                     id integer PRIMARY KEY DEFAULT nextval('order_id'),
                     user_id integer REFERENCES users(id) ON UPDATE CASCADE ON DELETE CASCADE,
                     drink_id integer REFERENCES drinks(id) ON UPDATE CASCADE ON DELETE CASCADE,
-                    quantity integer NOT NULL DEFAULT 1,
                     completed boolean DEFAULT FALSE,
                     time timestamp
                 );
@@ -191,22 +295,6 @@ class SetUpHandler(PostgresHandler):
         self.write("DONE\n")
         self.finish()
 
-class UserHandler(PostgresHandler):
-    @tornado.gen.coroutine
-    def get(self, id=None):
-        if not id:
-            sql = """
-                SELECT id, name, email, password
-                FROM users;
-            """
-            cursor = yield self.db().execute(sql)
-            desc = cursor.description
-            result = [dict(zip([col[0] for col in desc], row)) for row in cursor.fetchall()]
-            cursor.close()
-
-            self.write(json.dumps(result))
-            self.finish()
-
 class BatBotApplication(tornado.web.Application):
     def __init__(self, ioloop):
         logging.info("Starting logging!")
@@ -215,15 +303,16 @@ class BatBotApplication(tornado.web.Application):
         handlers = [
             #TODO tune these regex
             (r"/?", RootHandler),
-            (r"/user/?", UserHandler),
             (r"/setup/", SetUpHandler),
             (r"/customer/?", CustomerHandler),
             (r"/bartender/?", BartenderHandler),
+            (r"/menu/?", MenuHandler),
             (r"/v0/drink/", ApiDrinkHandler),
             (r"/v0/order/", ApiOrderHandler),
             (r"/v0/robot/", ApiRobotHandler),
             (r"/v0/customer/", ApiCustomerHandler),
             (r"/login/?", LoginHandler),
+            (r"/register/?", RegisterHandler),
             (r"/about/?", AboutHandler),
             (r"/logout/?", LogoutHandler),
         ]
@@ -242,8 +331,7 @@ class BatBotApplication(tornado.web.Application):
                   'host=localhost port=5432'
 
         self.db = momoko.Pool(dsn=dsn, size=1, ioloop=ioloop)
-        self.orders = []
-        self.drinks = [Drink("Beer", 3), Drink("Wine", 4)]
+        self.bartender = [1,2]
 
 
 def main():

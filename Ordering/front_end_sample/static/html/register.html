@@ -35,51 +35,55 @@
             <div class="mdl-layout__header-row portfolio-logo-row">
                 <span class="mdl-layout__title">
                     <div class="portfolio-logo"></div>
-                    <span class="mdl-layout__title">BarBot</span>
+                <span class="mdl-layout__title">BarBot</span>
                 </span>
             </div>
             <div class="mdl-layout__header-row portfolio-navigation-row mdl-layout--large-screen-only">
                 <nav class="mdl-navigation mdl-typography--body-1-force-preferred-font">
-                    <a class="mdl-navigation__link" href="/">Home</a>
-                    <a class="mdl-navigation__link is-active" href="/about/">About</a>
+                    <a class="mdl-navigation__link " href="/">Home</a>
+                    <a class="mdl-navigation__link" href="/about/">About</a>
                 </nav>
             </div>
         </header>
         <div class="mdl-layout__drawer mdl-layout--small-screen-only">
             <nav class="mdl-navigation mdl-typography--body-1-force-preferred-font">
-                <a class="mdl-navigation__link is-active" href="/">Home</a>
+                <a class="mdl-navigation__link " href="/">Home</a>
                 <a class="mdl-navigation__link" href="/about/">About</a>
             </nav>
         </div>
         <main class="mdl-layout__content">
-            <div class="mdl-grid portfolio-max-width">
-
+            <div class="mdl-grid portfolio-max-width portfolio-contact">
                 <div class="mdl-cell mdl-cell--12-col mdl-card mdl-shadow--4dp">
                     <div class="mdl-card__title">
-                        <h2 class="mdl-card__title-text">About</h2>
+                        <h2 class="mdl-card__title-text">Register</h2>
                     </div>
-
-                    <div class="mdl-grid portfolio-copy">
-                        <h3 class="mdl-cell mdl-cell--12-col mdl-typography--headline">Introduction</h3>
-                        <div class="mdl-cell mdl-cell--8-col mdl-card__supporting-text no-padding ">
+                    <div class="mdl-card__supporting-text">
+                        <form action="/register/" method="post" class="">
+                        <div class="mdl-textfield mdl-js-textfield mdl-textfield--floating-label">
+                                <input class="mdl-textfield__input" type="text" id="Name" name="Name">
+                                <label class="mdl-textfield__label" for="Name">Name...</label>
+                            </div>
+                            <div class="mdl-textfield mdl-js-textfield mdl-textfield--floating-label">
+                                <input class="mdl-textfield__input" pattern="[A-Z,a-z,0-9]*@[A-Z,a-z,0-9]*.[A-Z,a-z,0-9]*" type="text" id="Email" name="Email">
+                                <label class="mdl-textfield__label" for="Email">Email...</label>
+                            </div>
+                            <div class="mdl-textfield mdl-js-textfield mdl-textfield--floating-label">
+                                <input class="mdl-textfield__input" type="password" id="Password" name="Password">
+                                <label class="mdl-textfield__label" for="Password">Password...</label>
+                            </div>
                             <p>
-                                It's a robot that brings you drinks! Wow!
+                                <button class="mdl-button mdl-js-button mdl-button--raised mdl-js-ripple-effect mdl-button--accent" type="submit">
+                                    Submit
+                                </button>
                             </p>
-                        </div>
-                    </div>
-
-                    <div class="mdl-grid portfolio-copy">
-                        <h3 class="mdl-cell mdl-cell--12-col mdl-typography--headline">The Team</h3>
-                        <div class="mdl-cell mdl-cell--8-col mdl-card__supporting-text no-padding ">
-                            <div>Kim Kleiven (kkleiven@andrew.cmu.edu)</div>
-                            <div>Tommy Lau (kunfungl@andrew.cmu.edu)</div>
-                            <div>Vasu Agrawal (vasua@andrew.cmu.edu)</div>
-                            <div>Vivek Sridhar (viveksri@andrew.cmu.edu)</div>
-                        </div>
+                        </form>
+                        <form action="/register/" method="get" class="">
+                            <button class="mdl-button mdl-js-button mdl-button--raised mdl-js-ripple-effect mdl-button--accent" type="submit">
+                                Register
+                            </button>
+                        </form>
                     </div>
                 </div>
-
-
             </div>
             <footer class="mdl-mini-footer">
                 <div class="mdl-mini-footer__left-section">
