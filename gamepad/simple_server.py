@@ -31,6 +31,8 @@ class RootHandler(tornado.web.RequestHandler):
 ALIVE = False
 alive_time = time.time()
 
+last_write_time = time.time()
+
 def watchdog():
     logging.debug("Watchdog time difference: %f", time.time() - alive_time)
     ALIVE = (time.time() - alive_time) < 1
@@ -43,6 +45,7 @@ def watchdog():
         # Send a stop message
         if (ser):
             ser.write(out.encode('ascii'))
+            logging.info("WATCHDOG, Writing string " + repr(out))
         else:
             logging.info("WATCHDOG, Writing string " + repr(out))
 
@@ -191,9 +194,12 @@ class GamepadHandler(tornado.websocket.WebSocketHandler):
         logging.debug("Writing string " + repr(out))
 
         if (ser):
-            ser.write(out.encode('ascii'))
-            # logging.info("Writing string " + repr(out))
-            # logging.info("Read back " + repr(ser.readline()))
+            if (time.time() - last_write_time > .2):
+                ser.write(out.encode('ascii'))
+                last_write_time = time.time()
+                logging.info("MODE: %s, Writing string " + repr(out), mode)
+                # logging.info("Writing string " + repr(out))
+                # logging.info("Read back " + repr(ser.readline()))
         else:
             logging.info("MODE: %s, Writing string " + repr(out), mode)
 
