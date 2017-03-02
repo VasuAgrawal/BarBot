@@ -1,160 +1,147 @@
 #include <SPI.h>
+#include "deca_device_api.h"
+#include "deca_regs.h"
+#include "deca_spi.h"
 
-#define MSG_MAX_LEN 32
-#define chipSelectPin 10
-#define interruptPin 2
+/* Default communication configuration. We use here EVK1000's default mode (mode 3). */
+static dwt_config_t config = {
+    2,               /* Channel number. */
+    DWT_PRF_64M,     /* Pulse repetition frequency. */
+    DWT_PLEN_1024,   /* Preamble length. Used in TX only. */
+    DWT_PAC32,       /* Preamble acquisition chunk size. Used in RX only. */
+    9,               /* TX preamble code. Used in TX only. */
+    9,               /* RX preamble code. Used in RX only. */
+    1,               /* 0 to use standard SFD, 1 to use non-standard SFD. */
+    DWT_BR_110K,     /* Data rate. */
+    DWT_PHRMODE_STD, /* PHY header mode. */
+    (1025 + 64 - 32) /* SFD timeout (preamble length + 1 + SFD length - PAC size). Used in RX only. */
+};
 
-#define DWM_REG_DEV_ID      0x00
-#define DWM_REG_EUI         0x01
-#define DWM_REG_PANADR      0x03
-#define DWM_REG_SYS_CFG     0x04
-#define DWM_REG_SYS_TIME    0x06
-#define DWM_REG_TX_FCTRL    0x08
-#define DWM_REG_TX_BUFFER   0x09
-#define DWM_REG_DX_TIME     0x0A
-#define DWM_REG_RX_FWTO     0x0C
-#define DWM_REG_SYS_CTRL    0x0D
-#define DWM_REG_SYS_MASK    0x0E
-#define DWM_REG_SYS_STATUS  0x0F
-#define DWM_REG_RX_FINFO    0x10
-#define DWM_REG_RX_BUFFER   0x11
-#define DWM_REG_RX_FQUAL    0x12
-#define DWM_REG_RX_TTCKI    0x13
-#define DWM_REG_RX_TTCKO    0x14
-#define DWM_REG_RX_TIME     0x15
-#define DWM_REG_TX_TIME     0x17
-#define DWM_REG_TX_ANTD     0x18
-#define DWM_REG_SYS_STATE   0x19
-#define DWM_REG_ACK_RESP_T  0x1A
-#define DWM_REG_RX_SNIFF    0x1D
-#define DWM_REG_TX_POWER    0x1E
-#define DWM_REG_CHAN_CTRL   0x1F
-#define DWM_REG_USR_SFD     0x21
-#define DWM_REG_AGC_CTRL    0x23
-#define DWM_REG_EXT_SYNC    0x24
-#define DWM_REG_ACC_MEM     0x25
-#define DWM_REG_GPIO_CTRL   0x26
-#define DWM_REG_DRX_CONF    0x27
-#define DWM_REG_RF_CONF     0x28
-#define DWM_REG_TX_CAL      0x2A
-#define DWM_REG_FS_CTRL     0x2B
-#define DWM_REG_AON         0x2C
-#define DWM_REG_OTP_IF      0x2D
-#define DWM_REG_LDE_CTRL    0x2E
-#define DWM_REG_DIG_DIAG    0x2F
-#define DWM_REG_PMSC        0x36
+/* The frame sent in this example is an 802.15.4e standard blink. It is a 12-byte frame composed of the following fields:
+ *     - byte 0: frame type (0xC5 for a blink).
+ *     - byte 1: sequence number, incremented for each new frame.
+ *     - byte 2 -> 9: device ID, see NOTE 1 below.
+ *     - byte 10/11: frame check-sum, automatically set by DW1000.  */
+static uint8 tx_msg[] = {0xC5, 0, 'D', 'E', 'C', 'A', 'W', 'A', 'V', 'E', 0, 0};
+/* Index to access to sequence number of the blink frame in the tx_msg array. */
+#define BLINK_FRAME_SN_IDX 1
 
-#define DWM_HEADER_WRITE    (1 << 7)
+/* Inter-frame delay period, in milliseconds. */
+#define TX_DELAY_MS 1000
 
-#define DWM_CTRL_TXSTRT     (1 << 1)
-#define DWM_CTRL_WAIT4RESP  (1 << 7)
-#define DWM_CTRL_RXENAB     (1 << 8)
+typedef uint64_t uint64;
 
-#define DWM_INT_RXDFR       (1 << 13)
-
-byte msg_buf[MSG_MAX_LEN];
-
-void ISR_receive() {
-  Serial.println("message received");
-}
+static uint64 get_tx_timestamp_u64(void);
+static uint64 get_rx_timestamp_u64(void);
 
 void setup() {
-  // put your setup code here, to run once:
-
+  // Pause to allow time for opening serial console
+  delay(5000);
+  
+  // Set up Serial for debugging
   Serial.begin(115200);
 
-  // Start the SPI library
-  SPI.begin();
+  // Set up SPI
+  openspi();
 
-  // Initialize chip select pin
-  pinMode(chipSelectPin, OUTPUT);
-  digitalWrite(chipSelectPin, HIGH);
-  delay(100);
+  //@TODO: Set up ISR
 
-  // Configure chip to generate interrupts on receiving a message
-  /*
-  byte sys_mask[4];
-  ((uint32_t *)sys_mask)[0] |= DWM_INT_RXDFR;
-  writeRegister(DWM_REG_SYS_MASK, 4, sys_mask);
-  */
-  
-  // Attach interrupt service routine
-  //attachInterrupt(digitalPinToInterrupt(interruptPin), ISR_receive, RISING);
+  // Initialize Decawave Chip
+  if (dwt_initialise(DWT_LOADNONE) == DWT_ERROR) {
+    Serial.println("DWM1000: Initialization failed!");
+    while(1);
+  }
+  Serial.println("DWM1000: Initialization Complete");
 
-  // Set up test message
-  msg_buf[0] = 0xDE;
-  msg_buf[1] = 0xAD;
-  msg_buf[2] = 0xBE;
-  msg_buf[3] = 0xEF;
+  dwt_configure(&config);
+  Serial.println("DWM1000: Configuration Complete");
+
+  int deviceId = dwt_readdevid();
+  Serial.print("DWM1000: Device ID ");
+  Serial.println(deviceId);
 }
 
 void loop() {
-  // Read the device ID from the chip
-  readRegister(1, 8, msg_buf);
-  for (int i = 0; i < 8; i++) {
-    Serial.print(msg_buf[0], HEX);
-  }
-  Serial.println(' ');
-  // Transmit a message from the chip periodically
-  transmitMessage(4, msg_buf);
-  Serial.println("sent message");
-  delay(1000);
+  /* Write frame data to DW1000 and prepare transmission. See NOTE 4 below.*/
+  dwt_writetxdata(sizeof(tx_msg), tx_msg, 0); /* Zero offset in TX buffer. */
+  dwt_writetxfctrl(sizeof(tx_msg), 0, 0); /* Zero offset in TX buffer, no ranging. */
+
+  /* Start transmission. */
+  dwt_starttx(DWT_START_TX_IMMEDIATE);
+
+  /* Poll DW1000 until TX frame sent event set. See NOTE 5 below.
+   * STATUS register is 5 bytes long but, as the event we are looking at is in the first byte of the register, we can use this simplest API
+   * function to access it.*/
+  while (!(dwt_read32bitreg(SYS_STATUS_ID) & SYS_STATUS_TXFRS))
+  { };
+
+  uint64 tx_ts = get_tx_timestamp_u64();
+
+  Serial.println("Sent message");
+  Serial.print("Timestamp: ");
+  Serial.print((unsigned int)tx_ts);
+
+  /* Clear TX frame sent event. */
+  dwt_write32bitreg(SYS_STATUS_ID, SYS_STATUS_TXFRS);
+
+  /* Execute a delay between transmissions. */
+  deca_sleep(TX_DELAY_MS);
+
+  /* Increment the blink frame sequence number (modulo 256). */
+  tx_msg[BLINK_FRAME_SN_IDX]++;
+  
 }
 
-//@TODO: Currently assuming single octet headers. Expand this.
-
-// Transmit a message
-void transmitMessage(byte numBytes, byte buf[]) {
-  // Configuration information for transmission
-  byte tx_config[5];
-  // Assume standard frame length - 127 bytes max
-  // Length of message - bits 6-0 of first config byte
-  tx_config[0] = numBytes;
-  // Everything else can be left as default
-
-  byte sys_ctrl[4];
-  readRegister(DWM_REG_SYS_CTRL, 4, sys_ctrl);
-  sys_ctrl[0] |= DWM_CTRL_TXSTRT;
-
-  // Load the TX buffer
-  writeRegister(DWM_REG_TX_BUFFER, numBytes, buf);
-  // Write the TX configuration
-  writeRegister(DWM_REG_TX_FCTRL, 5, tx_config);
-  // Start the transmission
-  writeRegister(DWM_REG_SYS_CTRL, 4, sys_ctrl);
+/*! ------------------------------------------------------------------------------------------------------------------
+ * @fn get_tx_timestamp_u64()
+ *
+ * @brief Get the TX time-stamp in a 64-bit variable.
+ *        /!\ This function assumes that length of time-stamps is 40 bits, for both TX and RX!
+ *
+ * @param  none
+ *
+ * @return  64-bit value of the read time-stamp.
+ */
+static uint64 get_tx_timestamp_u64(void)
+{
+    uint8 ts_tab[5];
+    uint64 ts = 0;
+    int i;
+    dwt_readtxtimestamp(ts_tab);
+    printf("tx buf: ");
+    for (i = 4; i >= 0; i--)
+    {
+        printf("|%d", ts_tab[i]);
+        ts <<= 8;
+        ts |= ts_tab[i];
+    }
+    printf("|\n");
+    return ts;
 }
 
-// Read a message (assuming a message is ready to be read - this function does not perform that check
-void receiveMessage(byte numBytes, byte buf[]) {
-  readRegister(DWM_REG_RX_BUFFER, numBytes, buf);
+/*! ------------------------------------------------------------------------------------------------------------------
+ * @fn get_rx_timestamp_u64()
+ *
+ * @brief Get the RX time-stamp in a 64-bit variable.
+ *        /!\ This function assumes that length of time-stamps is 40 bits, for both TX and RX!
+ *
+ * @param  none
+ *
+ * @return  64-bit value of the read time-stamp.
+ */
+static uint64 get_rx_timestamp_u64(void)
+{
+    uint8 ts_tab[5];
+    uint64 ts = 0;
+    int i;
+    dwt_readrxtimestamp(ts_tab);
+    printf("rx buf: ");
+    for (i = 4; i >= 0; i--)
+    {
+        printf("|%d", ts_tab[i]);
+        ts <<= 8;
+        ts |= ts_tab[i];
+    }
+    printf("|\n");
+    return ts;
 }
-
-// Read bytes from a register into a buffer
-void readRegister(byte reg, int numBytes, byte buf[]) {
-  byte header = 0;
-  header |= reg; // Register to read from
-
-  // SPI transaction
-  digitalWrite(chipSelectPin, LOW);
-  SPI.transfer(header);
-  for (int i = 0; i < numBytes; i++) {
-    buf[i] = SPI.transfer(0x00);
-  }
-  digitalWrite(chipSelectPin, HIGH);
-}
-
-// Write bytes from a buffer into a register
-void writeRegister(byte reg, int numBytes, byte buf[]) {
-  byte header = 0;
-  header |= reg;
-  header |= DWM_HEADER_WRITE;
-
-  // SPI transaction
-  digitalWrite(chipSelectPin, LOW);
-  SPI.transfer(header);
-  for (int i = 0; i < numBytes; i++) {
-    SPI.transfer(buf[i]);
-  }
-  digitalWrite(chipSelectPin, HIGH);
-}
-
