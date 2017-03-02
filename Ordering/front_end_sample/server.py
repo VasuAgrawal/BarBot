@@ -5,62 +5,72 @@ import json
 from Order import Order
 from Drink import Drink
 
+import tornado.gen
 import tornado.ioloop
 import tornado.web
+import momoko
 
-orders = []
-drinks = [Drink("Beer", 3), Drink("Wine", 4)]
+class PostgresHandler(tornado.web.RequestHandler):
+    def prepare(self):
+        if self.request.headers.get("Content-Type") == "application/json":
+            try:
+                self.json_args = json_decode(self.request.body)
+            except Exception as error:
+                self.finish('invalid request')
 
-class BaseHandler(tornado.web.RequestHandler):
+    def db(self):
+        return self.application.db
+
+class BaseHandler(PostgresHandler):
     def get_current_user(self):
         return self.get_secure_cookie("user")
 
-class RootHandler(tornado.web.RequestHandler):
+class RootHandler(PostgresHandler):
     def get(self):
         self.render("static/html/index.html")
 
-class LoginHandler(tornado.web.RequestHandler):
+class LoginHandler(PostgresHandler):
     def get(self):
         self.render("static/html/login.html")
 
-class LogoutHandler(tornado.web.RequestHandler):
+class LogoutHandler(PostgresHandler):
     def get(self):
         self.redirect("/")
 
-class AboutHandler(tornado.web.RequestHandler):
+class AboutHandler(PostgresHandler):
     def get(self):
         self.render("static/html/about.html")
 
-class CustomerHandler(tornado.web.RequestHandler):
+class CustomerHandler(PostgresHandler):
     #@tornado.web.authenticated # Example of authentication
     def get(self):
         print("Doing customer handler!")
         # TODO figure out how to not hard code "static" here
-        self.render("static/html/customer.html", drinks=drinks)
+        self.render("static/html/customer.html", drinks=self.drinks)
 
     def post(self):
         print("got post request!")
         print(self.get_argument("Email"), self.get_argument("Password"))
         self.redirect("/customer/")
 
-class BartenderHandler(tornado.web.RequestHandler):
+class BartenderHandler(PostgresHandler):
     def get(self):
         # TODO figure out how to not hard code "static" here
-        self.render("static/html/bartender.html", orders=orders)
+        self.render("static/html/bartender.html", orders=self.orders)
 
     def post(self):
         print("got a bartender post request")
         id = int(self.get_argument("orderId"))
         print("removing order %d" % id)
-        for order in orders:
+        for order in self.orders:
             if order.id == id:
-                orders.remove(order)
+                self.orders.remove(order)
                 break
         self.redirect("/bartender/")
 
 
 
-class ApiDrinkHandler(tornado.web.RequestHandler):
+class ApiDrinkHandler(PostgresHandler):
     def get(self):
         print(self.get_argument("id", default=None))
         self.write(json.dumps({"drink1": "beer"}))
@@ -69,54 +79,93 @@ class ApiDrinkHandler(tornado.web.RequestHandler):
         print(self.get_argument("id"))
 
 
-class ApiOrderHandler(tornado.web.RequestHandler):
+class ApiOrderHandler(PostgresHandler):
     def get(self):
         self.write(json.dumps({"order1": "some order"}))
 
     def post(self):
-        for drink in drinks:
+        for drink in self.drinks:
             if self.get_argument(drink.type + "-checkbox", default=None) != None:
-                orders.append(Order("Bob", drink.type, 0))
+                self.orders.append(Order("Bob", drink.type, 0))
         self.redirect("/customer/")
 
 
-class ApiRobotHandler(tornado.web.RequestHandler):
+class ApiRobotHandler(PostgresHandler):
     def get(self):
         self.write(json.dumps({"robot": "robot data!"}))
 
 
-class ApiCustomerHandler(tornado.web.RequestHandler):
+class ApiCustomerHandler(PostgresHandler):
     def get(self):
         self.write(json.dumps({"customer": "customer data"}))
 
+class UserHandler(PostgresHandler):
+
+    @tornado.gen.coroutine
+    def get(self, id=None):
+        if not id:
+            sql = """
+                SELECT id, username, email, password
+                FROM users;
+            """
+            cursor = yield self.db().execute(sql)
+            desc = cursor.description
+            result = [dict(zip([col[0] for col in desc], row)) for row in cursor.fetchall()]
+            cursor.close()
+
+            self.write(json.dumps(result))
+            self.finish()
+
+class BatBotApplication(tornado.web.Application):
+    def __init__(self, ioloop):
+        logging.info("Starting logging!")
+        logging.root.setLevel(logging.DEBUG)
+
+        handlers = [
+            #TODO tune these regex
+            (r"/?", RootHandler),
+            (r"/user/?", UserHandler),
+            (r"/customer/?", CustomerHandler),
+            (r"/bartender/?", BartenderHandler),
+            (r"/v0/drink/", ApiDrinkHandler),
+            (r"/v0/order/", ApiOrderHandler),
+            (r"/v0/robot/", ApiRobotHandler),
+            (r"/v0/customer/", ApiCustomerHandler),
+            (r"/login/?", LoginHandler),
+            (r"/about/?", AboutHandler),
+            (r"/logout/?", LogoutHandler),
+        ]
+
+        settings = {
+            "static_path": "static",
+            "cookie_secret": "TODO some real cookie secret",
+            "login_url": "/",
+            "debug": True,
+            "autoreload": True,
+        }
+
+        tornado.web.Application.__init__(self, handlers, **settings)
+
+        dsn = 'dbname=barbotdb user=barbotdev password=icanswim ' \
+                  'host=localhost port=5432'
+
+        self.db = momoko.Pool(dsn=dsn, size=1, ioloop=ioloop)
+        self.orders = []
+        self.drinks = [Drink("Beer", 3), Drink("Wine", 4)]
+
+
+
 def main():
-    logging.info("Starting logging!")
-    logging.root.setLevel(logging.DEBUG)
-
-    handlers = [
-        #TODO tune these regex
-        (r"/?", RootHandler),
-        (r"/customer/?", CustomerHandler),
-        (r"/bartender/?", BartenderHandler),
-        (r"/v0/drink/", ApiDrinkHandler),
-        (r"/v0/order/", ApiOrderHandler),
-        (r"/v0/robot/", ApiRobotHandler),
-        (r"/v0/customer/", ApiCustomerHandler),
-        (r"/login/?", LoginHandler),
-        (r"/about/?", AboutHandler),
-        (r"/logout/?", LogoutHandler),
-    ]
-
-    settings = {
-        "static_path": "static",
-        "cookie_secret": "TODO some real cookie secret",
-        "login_url": "/",
-        "debug": True,
-        "autoreload": True,
-    }
+    ioloop = tornado.ioloop.IOLoop.instance()
+    app = BatBotApplication(ioloop)
     
-    tornado.web.Application(handlers, **settings).listen(8888)
-    tornado.ioloop.IOLoop.current().start()
+    dbConnection = app.db.connect()
+    ioloop.add_future(dbConnection, lambda f: ioloop.stop())
+    ioloop.start()
+    dbConnection.result()
+
+    app.listen(8888)
+    ioloop.start()
 
 if __name__ == "__main__":
     main()

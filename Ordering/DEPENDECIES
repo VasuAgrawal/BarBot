@@ -1,0 +1,6 @@
+python-dev: sudo apt-get install python-dev
+tornado: sudo pip install tornado
+postgresql: sudo apt-get install postgresql
+python-psycopg2: sudo apt-get install python-psycopg2
+libpq-dev: sudo apt-get install libpq-dev
+momoko: sudo pip install momoko
