@@ -18,6 +18,16 @@ function start_ws() {
     ws.onmessage = function(e) {
         console.log("Received message " + e);
     }
+
+    heartbeat_ws = new ReconnectingWebSocket("ws://" + location.host + 
+                "/heartbeat", null, {});
+
+    heartbeat_ws.onopen = function() {
+        setInterval(function() {
+            console.log("Sending heartbeat message");
+            heartbeat_ws.send("Don't kill me pl0x");
+        }, 500);
+    }
 }
 
 function gamepadHandler() {
@@ -32,6 +42,8 @@ function gamepadHandler() {
             this.timestamps[i] = 0;
         }
 
+        // Timestamp is in milliseconds. We impose a false 200 ms latency to
+        // reduce congestion on the line.
         if (gamepad && gamepad.connected && 
             gamepad.timestamp > this.timestamps[i]) {
             
