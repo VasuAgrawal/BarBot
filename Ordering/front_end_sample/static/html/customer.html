@@ -60,27 +60,19 @@
                         <h2 class="mdl-card__title-text">Order</h2>
                     </div>
                     <div class="mdl-card__supporting-text">
-                        <form action="/v0/order/" method="post" class="">
-                            <table class="mdl-data-table mdl-js-data-table mdl-shadow--2dp">
-                              <thead>
-                                <tr>
-                                  <th class="mdl-data-table__cell--non-numeric">Drink</th>
-                                  <th>Price</th>
-                                </tr>
-                              </thead>
-                              <tbody>
-                                {% for drink in drinks %}
-                                    {% include 'drink.html' %}
-                                {% end %}
-                              </tbody>
-                            </table>
-
-                            <p>
-                                <button class="mdl-button mdl-js-button mdl-button--raised mdl-js-ripple-effect mdl-button--accent" type="submit">
-                                    Submit
-                                </button>
-                            </p>
-                        </form>
+                      <table class="mdl-data-table mdl-js-data-table mdl-shadow--2dp">
+                        <thead>
+                          <tr>
+                            <th class="mdl-data-table__cell--non-numeric">Drink</th>
+                            <th>Price</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {% for drink in drinks %}
+                              {% include 'drink.html' %}
+                          {% end %}
+                        </tbody>
+                      </table>
                     </div>
                 </div>
             </div>
