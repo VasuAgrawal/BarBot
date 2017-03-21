@@ -5,7 +5,11 @@ from mpl_toolkits.mplot3d import Axes3D
 import pprint
 import shutil
 
+import packet
+from protos.dwdistance_pb2 import DwDistance
+import time
 import logging
+import socket
 # from typing import 
 
 class Beacon(object):
@@ -54,7 +58,7 @@ class Beacon(object):
         # Add normal noise, usually between [-3*scale, 3*scale] meters
         noise = (0 if self.noise_stdev <= 0 else 
                 np.random.normal(loc=self.noise_mean, scale=self.noise_stdev))
-        return distance + noise
+        return max(distance + noise, 0)
 
 
     def update(self, time, pos):
@@ -69,22 +73,27 @@ class GLS(object):
     
     def __init__(self, beacons=0, wristbands=0):
         self._num_beacons = beacons
-        self._beacons = [Beacon(noise_stdev=0, tag=tag, dropout=0) for tag in range(beacons)]
+        self._beacons = [Beacon(noise_stdev=.1, tag=tag, dropout=.5) 
+                for tag in range(beacons)]
         self._sim_time = 0
-        # Yes they're aliased, no I don't care.
+        # Yes they're aliased, no, it doesn't matter.
         self._measurements = [[0] * self._num_beacons] * self._num_beacons
         # ignore the wristbands for now
 
 
     def print_measurements(self):
+        print("Measurements at time", self._sim_time)
         console_size = shutil.get_terminal_size((80, 40))
         # Fit the mesurements nicely into columns.
-        left_width = 3
+        left_width = 0
         col_width = (console_size.columns - left_width) // self._num_beacons
-        fmt = "%{}d".format(left_width) + (
-                "%{}f".format(col_width) * self._num_beacons)
+        single = "%{}f".format(col_width)
+        fmt = "%s" * self._num_beacons
+        none_str = " " * (col_width - 4) + "None"
         for i, line in enumerate(self._measurements):
-            print(fmt % ((i,) + tuple(line)))
+            print(fmt % tuple([single % elem if elem is not None else none_str
+                for elem in line]))
+        print()
 
 
     def step(self):
@@ -97,6 +106,7 @@ class GLS(object):
                 self._measurements[src_idx].append(src.update(self._sim_time,
                     dest.pos))
         self.print_measurements()
+        self._sim_time += 1
 
 
     def display(self, ax):
@@ -137,36 +147,48 @@ class GLS(object):
         #   For every pair (i, j):
         #       J(
 
+    def send_updates(self):
+        # Have every beacon start a new connection, send whatever updates it can
+        # to the server, and then close the connections. This isn't quite how
+        # the beacons will work, but it should stress the server more this way.
+        # connections = [tornado.tcpclient.TCPClient()
+                # for i in range(self._num_threads)]
+        try:
+            connections = [socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                    for i in range(self._num_beacons)]
+            for conn in connections:
+                conn.connect(("localhost", 8888))
+
+            for send, line in enumerate(self._measurements):
+                for recv, dist in enumerate(line):
+                    if dist is not None:
+                        msg = DwDistance()
+                        msg.send_id = send
+                        msg.recv_id = recv
+                        msg.dist = dist
+                        data = packet.make_packet_from_bytes(
+                                msg.SerializeToString())
+                        connections[send].send(data)
+            for conn in connections:
+                conn.close()
+        except ConnectionRefusedError:
+            pass
+
 
 def main():
     logging.root.setLevel(logging.DEBUG)
     gls = GLS(beacons=10)
-    gls.step()
-    gls.solve()
+    while True:
+        gls.step()
+        gls.send_updates()
+        time.sleep(1)
+    # gls.solve()
 
     # fig = plt.figure()
     # ax = fig.add_subplot(111, projection='3d')
     # gls.display(ax)
     # plt.show()
-     
 
 
 if __name__ == "__main__":
     main()
-
-# import math
-
-# points = [(0, 0), (1, 0), (1, 1), (0, 1)]
-# D = np.zeros((4, 4), dtype=float)
-# for i in range(4):
-    # for j in range(4):
-        # x_i = points[i]
-        # x_j = points[j]
-        # D[i][j] = math.sqrt((x_i[0] - x_j[0]) ** 2 + (x_i[1] - x_j[1]) ** 2)
-
-# print(D)
-
-# M = np.zeros((4, 4), dtype = float)
-# for i in range(4):
-    # for j in range(4):
-        # M[i, j] = (D[0, j] ** 2 + D[j

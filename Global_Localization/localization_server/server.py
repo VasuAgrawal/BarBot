@@ -2,6 +2,7 @@ import tornado
 import tornado.gen
 import tornado.ioloop
 import tornado.locks
+import tornado.iostream
 import tornado.tcpserver
 
 import packet
@@ -20,13 +21,16 @@ class DataRecvServer(tornado.tcpserver.TCPServer):
     
     @tornado.gen.coroutine
     def handle_stream(self, stream, address): 
-        print("Opened stream from address", address)
+        # print("Opened stream from address", address)
         while True:
-            # Continually read data from the stream
-            message_bytes = yield packet.read_packet_from_stream(stream)
+            try:
+                # Continually read data from the stream
+                message_bytes = yield packet.read_packet_from_stream(stream)
+            except tornado.iostream.StreamClosedError:
+                return
+
             message = DwDistance()
             message.ParseFromString(message_bytes)
-            print(message)
             # At some point, come up with a more intelligent system that
             # involves a rolling average for the beacons, and just uses the most
             # recent point for the people.
@@ -38,6 +42,7 @@ def parser():
     with (yield pdist_lock.acquire()):
         local_pdist = np.copy(pdist)
     print(local_pdist)
+    print()
 
 def main():
     # threading.Thread(target=parser).start()
