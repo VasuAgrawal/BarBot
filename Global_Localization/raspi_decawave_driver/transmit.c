@@ -78,6 +78,9 @@ int main(void)
     int deviceId = dwt_readdevid();
     printf("DWM1000: Device ID %x\n", deviceId);
 
+    int temp = dwt_read32bitreg(SYS_STATUS_ID);
+    printf("Status: %d\n", temp);
+
     /* Loop forever sending frames periodically. */
     while(1)
     {
@@ -87,6 +90,8 @@ int main(void)
 
         /* Start transmission. */
         dwt_starttx(DWT_START_TX_IMMEDIATE);
+
+        printf("Started\n");
 
         /* Poll DW1000 until TX frame sent event set. See NOTE 5 below.
          * STATUS register is 5 bytes long but, as the event we are looking at is in the first byte of the register, we can use this simplest API
