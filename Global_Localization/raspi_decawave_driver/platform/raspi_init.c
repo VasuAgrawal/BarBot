@@ -40,6 +40,13 @@ void raspiDecawaveInit() {
     // Initialize the GPIO
     piHandle = pigpio_start(NULL, NULL);
 
+    // Disable reset pin
+    set_mode(piHandle, DWM_RESET_PIN, PI_OUTPUT);
+    gpio_write(piHandle, DWM_RESET_PIN, 0);
+    deca_sleep(100);
+    set_pull_up_down(piHandle, DWM_RESET_PIN, PI_PUD_OFF);
+    set_mode(piHandle, DWM_RESET_PIN, PI_INPUT);
+
     // Initialize SPI
     if (openspi() != 0) {
         printf("Failed to initialize SPI!\n");
