@@ -195,7 +195,7 @@ int main(void)
 
     /* Set up interrupt handlers */
     dwt_setcallbacks(txDoneISR, rxGoodISR, NULL, rxErrorISR);
-    dwt_setinterrupt(DWT_INT_RFCG | DWT_INT_RFCE | DWT_INT_RPHE | DWM_INT_TRFS, 1);
+    dwt_setinterrupt(DWT_INT_RFCG | DWT_INT_RFCE | DWT_INT_RPHE | DWT_INT_TFRS, 1);
 
     /* Loop forever initiating ranging exchanges. */
     while (1)
