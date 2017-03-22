@@ -92,7 +92,11 @@ class DW(object):
         # Determine whether or not to provide a measurement update, providing
         # that update if yes.
         if time % self.freq == 0 and not np.random.binomial(1, self.dropout):
-            return self.distance(dest_pos)
+            # Add a maximum distance to be slightly more realistic
+            dist = self.distance(dest_pos)
+            if dist < 5:
+                return dist
+            # return self.distance(dest_pos)
         return None
 
 
@@ -240,6 +244,9 @@ class GLS(object):
                         msg.recv_id = recv.tag
                         msg.dist = dist
                         msg.beacon = src.beacon
+                        # Ignore the timestamp for now, not sure how to add that
+                        # in a good way from sim.
+
                         data = packet.make_packet_from_bytes(
                                 msg.SerializeToString())
                         connections[src_idx].send(data)
