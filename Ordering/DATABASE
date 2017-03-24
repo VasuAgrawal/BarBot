@@ -1,0 +1,6 @@
+sudo su - postgres
+createdb barbotdb
+createuser barbotdev
+psql
+alter user barbotdev with encrypted password 'icanswim';
+grant all privilleges on database barbotdb to barbotdev;
