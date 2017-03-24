@@ -170,7 +170,7 @@ class GLS(object):
 
         self.ax.set_xlim([0, max(10, max(all_points[0]))])
         self.ax.set_ylim([0, max(10, max(all_points[1]))])
-        self.ax.set_zlim([0, max(5,  max(all_points[2]))])
+        self.ax.set_zlim([0, max(4,  max(all_points[2]))])
         self.ax.scatter(*beacon_points, c=[1.0, 0.0, 0.0, 1.0], alpha=1.0,
                 marker='s')
         self.ax.scatter(*wristband_points, c=[0.0, 1.0, 0.0, 1.0], alpha=1.0,
@@ -229,20 +229,25 @@ class GLS(object):
             for conn in connections:
                 conn.connect(("localhost", 8888))
 
-            for send, line in enumerate(self._measurements):
-                for recv, dist in enumerate(line):
-                    if dist is not None:
+            
+            for src_idx, src in enumerate(self._modules):
+                line = self._measurements[src_idx]
+                for recv_idx, recv in enumerate(self._modules):
+                    dist = line[recv_idx]
+                    if dist is not None: # Should be None along diagonal
                         msg = DwDistance()
-                        msg.send_id = send
-                        msg.recv_id = recv
+                        msg.send_id = src.tag
+                        msg.recv_id = recv.tag
                         msg.dist = dist
+                        msg.beacon = src.beacon
                         data = packet.make_packet_from_bytes(
                                 msg.SerializeToString())
-                        connections[send].send(data)
+                        connections[src_idx].send(data)
+
             for conn in connections:
                 conn.close()
         except ConnectionRefusedError:
-            pass
+            logging.error("Unable to connect to server!")
 
 
 def main():
