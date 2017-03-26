@@ -8,8 +8,9 @@
  */
 
 #include <stdint.h>
-#include <pigpio.h>
+#include <pigpiod_if2.h>
 #include <deca_device_api.h>
+#include <stdio.h>
 
 #include "deca_spi.h"
 
@@ -17,6 +18,8 @@
 #define DWM_SPI_FREQUENCY   500000
 
 int spiHandle;
+
+extern int piHandle;
 
 /**
  * @function openspi()
@@ -29,7 +32,7 @@ int openspi()
     int spiconfig = 0;
     spiconfig |= (1 << 8); // Configure it to use spi1
 
-    spiHandle = spiOpen(DWM_SPI_CS, DWM_SPI_FREQUENCY, spiconfig);
+    spiHandle = spi_open(piHandle, DWM_SPI_CS, DWM_SPI_FREQUENCY, spiconfig);
 
     if (spiHandle < 0) {
         return -1;
@@ -78,7 +81,7 @@ int writetospi(uint16 headerLength, const uint8 *headerBuffer, uint32 bodyLength
     }
 
     // Perform SPI transaction
-    spiWrite(spiHandle, spi_buf, headerLength + bodyLength);
+    spi_write(piHandle, spiHandle, spi_buf, headerLength + bodyLength);
 
     decamutexoff(s);
 
@@ -113,7 +116,7 @@ int readfromspi(uint16 headerLength, const uint8 *headerBuffer, uint32 readLengt
     char rx_buf[headerLength + readLength];
 
     // Perform SPI transaction
-    spiXfer(spiHandle, tx_buf, rx_buf, headerLength + readLength);
+    spi_xfer(piHandle, spiHandle, tx_buf, rx_buf, headerLength + readLength);
 
     // Copy read data back into readBuffer
     for (i = 0; i < readLength; i++) {

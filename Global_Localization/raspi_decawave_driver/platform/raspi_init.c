@@ -11,7 +11,6 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <pigpiod_if2.h>
-#include <pigpio.h>
 #include <deca_device_api.h>
 
 #include "deca_spi.h"
@@ -19,6 +18,8 @@
 
 /** @brief Flag for masking interrupts - used in decamutex */
 int DECA_MUTEX_FLAG;
+
+int piHandle;
 
 /**
  * @function void DECAWAVE_RPI_ISR()
@@ -36,11 +37,8 @@ void DECAWAVE_RPI_ISR(int pi, unsigned user_gpio, unsigned level, uint32_t tick)
  * @brief Initializes platform-specific hardware for the Decawave
  */
 void raspiDecawaveInit() {
-    // Set up the pigpio library
-    if (gpioInitialise() < 0) {
-        printf("Failed to initialize pigpio\n");
-        exit(EXIT_FAILURE);
-    }
+    // Initialize the GPIO
+    piHandle = pigpio_start(NULL, NULL);
 
     // Initialize SPI
     if (openspi() != 0) {
@@ -52,9 +50,8 @@ void raspiDecawaveInit() {
     // Defaults to interrupt on a rising edge (Decawave chip IRQ polarity is
     // default active high)
     DECA_MUTEX_FLAG = 1; // Interrupts "enabled"
-    if (callback(pigpio_start(NULL, NULL), DWM_INTERRUPT_PIN, RISING_EDGE, DECAWAVE_RPI_ISR) < 0) {
+    if (callback(piHandle, DWM_INTERRUPT_PIN, RISING_EDGE, DECAWAVE_RPI_ISR) < 0) {
         printf("Failed to initialize callback!\n");
         exit(EXIT_FAILURE);
     }
-    //wiringPiISR(DWM_INTERRUPT_PIN, INT_EDGE_RISING, DECAWAVE_RPI_ISR);
 }
