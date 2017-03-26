@@ -8,7 +8,8 @@
 #ifndef _RASPI_INIT_H_
 #define _RASPI_INIT_H_
 
-#define DWM_INTERRUPT_PIN 5
+#define DWM_INTERRUPT_PIN 22
+#define DWM_RESET_PIN 27
 
 void raspiDecawaveInit();
 

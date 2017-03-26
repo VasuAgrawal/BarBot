@@ -16,6 +16,7 @@
 #include <deca_device_api.h>
 #include <deca_regs.h>
 #include <raspi_init.h>
+#include <thread>
 
 /* Example application name and version to display on LCD screen. */
 #define APP_NAME "SIMPLE RX v1.2"
@@ -76,6 +77,12 @@ void rxGoodISR(const dwt_cb_data_t *cbData) {
     dwt_rxenable(DWT_START_RX_IMMEDIATE);
 }
 
+void delayThread() {
+    while(1) {
+        deca_sleep(1000);
+    }
+}
+
 /**
  * Application entry point.
  */
@@ -85,7 +92,7 @@ int main(void)
     raspiDecawaveInit();
 
     /* Initialize */
-    if (dwt_initialise(DWT_LOADNONE) == DWT_ERROR)
+    if (dwt_initialise(DWT_LOADUCODE) == DWT_ERROR)
     {
         printf("DWM1000: Initialization Failed!\n");
         while (1)
@@ -102,12 +109,14 @@ int main(void)
 
     /* Set up interrupt handlers */
     dwt_setcallbacks(NULL, rxGoodISR, NULL, rxErrorISR);
+    dwt_setinterrupt(DWT_INT_RFCG | DWT_INT_RFCE | DWT_INT_RPHE, 1);
 
     /* Activate reception immediately. See NOTE 3 below. */
     dwt_rxenable(DWT_START_RX_IMMEDIATE);
 
     /* Loop forever receiving frames. */
-    while (1);
+    std::thread rxThread(delayThread);
+    rxThread.join();
 }
 
 /*****************************************************************************************************************************************************

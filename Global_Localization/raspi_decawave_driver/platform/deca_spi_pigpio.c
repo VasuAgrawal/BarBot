@@ -10,7 +10,6 @@
 #include <stdint.h>
 #include <pigpiod_if2.h>
 #include <deca_device_api.h>
-#include <stdio.h>
 
 #include "deca_spi.h"
 
@@ -18,8 +17,6 @@
 #define DWM_SPI_FREQUENCY   500000
 
 int spiHandle;
-
-extern int piHandle;
 
 /**
  * @function openspi()
@@ -32,12 +29,11 @@ int openspi()
     int spiconfig = 0;
     spiconfig |= (1 << 8); // Configure it to use spi1
 
-    spiHandle = spi_open(piHandle, DWM_SPI_CS, DWM_SPI_FREQUENCY, spiconfig);
-
-    if (spiHandle < 0) {
-        return -1;
+    if (spiHandle = spiOpen(DWM_SPI_CS, DWM_SPI_FREQUENCY, spiconfig)) {
+        return 0;
     }
-    return 0;
+    
+    return -1;
 }
 
 /**
@@ -72,7 +68,7 @@ int writetospi(uint16 headerLength, const uint8 *headerBuffer, uint32 bodyLength
     decaIrqStatus_t s = decamutexon();
 
     // Construct SPI buffer
-    char spi_buf[headerLength + bodyLength];
+    uint8_t spi_buf[headerLength + bodyLength];
     for (i = 0; i < headerLength; i++) {
         spi_buf[i] = headerBuffer[i];
     }
@@ -81,7 +77,7 @@ int writetospi(uint16 headerLength, const uint8 *headerBuffer, uint32 bodyLength
     }
 
     // Perform SPI transaction
-    spi_write(piHandle, spiHandle, spi_buf, headerLength + bodyLength);
+    spiWrite(spiHandle, spi_buf, headerLength + bodyLength);
 
     decamutexoff(s);
 
@@ -109,14 +105,14 @@ int readfromspi(uint16 headerLength, const uint8 *headerBuffer, uint32 readLengt
     decaIrqStatus_t s = decamutexon();
 
     // Construct SPI buffer
-    char tx_buf[headerLength + readLength];
+    uint8_t tx_buf[headerLength + readLength];
     for (i = 0; i < headerLength; i++) {
         tx_buf[i] = headerBuffer[i];
     }
-    char rx_buf[headerLength + readLength];
+    uint8_t rx_buf[headerLength + readLength];
 
     // Perform SPI transaction
-    spi_xfer(piHandle, spiHandle, tx_buf, rx_buf, headerLength + readLength);
+    spiXfer(spiHandle, tx_buf, rx_buf, headerLength + readLength);
 
     // Copy read data back into readBuffer
     for (i = 0; i < readLength; i++) {

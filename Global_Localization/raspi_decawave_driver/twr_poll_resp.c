@@ -283,7 +283,7 @@ int main(void)
                             for (int i = 0; i < 10; i++) {
                                 dist_sum += dist_buf[i];
                             }
-                            printf("DIST: %3.2f m\n", dist_sum / 10.0);
+                            printf("%3.2f\n", dist_sum / 10.0);
 
                             dist_buf_idx = 0;
                         }
