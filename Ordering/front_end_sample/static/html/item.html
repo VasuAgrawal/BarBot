@@ -1,0 +1,12 @@
+<form action="/menu/" method="post">
+    <input type="hidden" name="drinkId" value="{{ drink.id }}"/>
+    <tr class="drink" id="m{{ drink.id }}">
+      <td class="mdl-data-table__cell--non-numeric">{% module linkify(drink.type) %}</td>
+      <td>{% module linkify("$" + str(drink.price)) %}</td>
+      <td>
+        <button class="mdl-button mdl-js-button mdl-button--raised mdl-js-ripple-effect mdl-button--accent" type="submit">
+            Delete
+        </button>
+      </td>
+    </tr>
+</form>

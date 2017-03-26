@@ -1,9 +1,12 @@
-<tr class="drink" id="{{ drink.id }}">
-  <td class="mdl-data-table__cell--non-numeric">
-    <label class="mdl-checkbox mdl-js-checkbox mdl-js-ripple-effect" for= "{{drink.type + '-checkbox'}}">
-        <input type="checkbox" id= "{{drink.type + '-checkbox'}}"class="mdl-checkbox__input" name= "{{drink.type + '-checkbox'}}">
-        <span class="mdl-checkbox__label">{% module linkify(drink.type) %}</span>
-    </label>
-  </td>
-  <td>{% module linkify("$" + str(drink.price)) %}</td>
-</tr>
+<form action="/v0/order/" method="post">
+    <input type="hidden" name="drinkId" value="{{ drink.id }}"/>
+    <tr class="drink" id="m{{ drink.id }}">
+      <td class="mdl-data-table__cell--non-numeric">{% module linkify(drink.type) %}</td>
+      <td>{% module linkify("$" + str(drink.price)) %}</td>
+      <td>
+        <button class="mdl-button mdl-js-button mdl-button--raised mdl-js-ripple-effect mdl-button--accent" type="submit">
+            Order
+        </button>
+      </td>
+    </tr>
+</form>

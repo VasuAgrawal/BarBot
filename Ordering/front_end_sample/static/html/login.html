@@ -41,7 +41,6 @@
             <div class="mdl-layout__header-row portfolio-navigation-row mdl-layout--large-screen-only">
                 <nav class="mdl-navigation mdl-typography--body-1-force-preferred-font">
                     <a class="mdl-navigation__link " href="/">Home</a>
-                    <a class="mdl-navigation__link is-active" href="/login/">Login</a>
                     <a class="mdl-navigation__link" href="/about/">About</a>
                 </nav>
             </div>
@@ -49,7 +48,6 @@
         <div class="mdl-layout__drawer mdl-layout--small-screen-only">
             <nav class="mdl-navigation mdl-typography--body-1-force-preferred-font">
                 <a class="mdl-navigation__link " href="/">Home</a>
-                <a class="mdl-navigation__link is-active" href="/login/">Login</a>
                 <a class="mdl-navigation__link" href="/about/">About</a>
             </nav>
         </div>
@@ -60,7 +58,7 @@
                         <h2 class="mdl-card__title-text">Login</h2>
                     </div>
                     <div class="mdl-card__supporting-text">
-                        <form action="/customer/" method="post" class="">
+                        <form action="/login/" method="post" class="">
                             <div class="mdl-textfield mdl-js-textfield mdl-textfield--floating-label">
                                 <input class="mdl-textfield__input" pattern="[A-Z,a-z,0-9]*@[A-Z,a-z,0-9]*.[A-Z,a-z,0-9]*" type="text" id="Email" name="Email">
                                 <label class="mdl-textfield__label" for="Email">Email...</label>
@@ -71,9 +69,14 @@
                             </div>
                             <p>
                                 <button class="mdl-button mdl-js-button mdl-button--raised mdl-js-ripple-effect mdl-button--accent" type="submit">
-                                    Submit
+                                    Log In
                                 </button>
                             </p>
+                        </form>
+                        <form action="/register/" method="get" class="">
+                            <button class="mdl-button mdl-js-button mdl-button--raised mdl-js-ripple-effect mdl-button--accent" type="submit">
+                                Register
+                            </button>
                         </form>
                     </div>
                 </div>

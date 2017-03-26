@@ -1,0 +1,11 @@
+Beacons:
+- Decawave ($25)
+- PoE Raspi Zero Board ($25)
+- Raspi Zero (FREE)
+- Decawave Hat (~$10)
+
+Wristbands:
+- Decawave ($25)
+- Atmega32u4 Breakout Board ($20)
+- RFID Tag ($3)
+- PCB (~$10)

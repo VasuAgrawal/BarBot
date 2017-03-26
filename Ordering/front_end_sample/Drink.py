@@ -1,9 +1,6 @@
 class Drink(object):
 
-    drinkId = 0
-
-    def __init__(self, drinkType, price):
+    def __init__(self, drinkId, drinkType, price):
         self.type = drinkType
         self.price = price
-        self.id = Drink.drinkId
-        Drink.drinkId += 1
+        self.id = drinkId
