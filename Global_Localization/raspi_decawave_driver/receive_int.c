@@ -85,7 +85,7 @@ int main(void)
     raspiDecawaveInit();
 
     /* Initialize */
-    if (dwt_initialise(DWT_LOADNONE) == DWT_ERROR)
+    if (dwt_initialise(DWT_LOADUCODE) == DWT_ERROR)
     {
         printf("DWM1000: Initialization Failed!\n");
         while (1)
