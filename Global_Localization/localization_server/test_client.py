@@ -27,6 +27,7 @@ def my_callback(stream):
         for send_idx, line in enumerate(pairwise):
             for recv_idx, dist in enumerate(line):
                 if send_idx == recv_idx: continue
+                if dist > 150: continue
                 message = DwDistance()
                 message.send_id = send_idx
                 message.recv_id = recv_idx

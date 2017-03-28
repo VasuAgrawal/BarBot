@@ -157,6 +157,62 @@ class PointSolver(object):
         plt.show(False)
         plt.pause(.001)
 
+    def data_delay(self):
+        time.sleep(1)
+
+    def distance_loss(self, M1, M2):
+        assert(M1.shape == M2.shape)
+        m1_line = M1.reshape(M1.size)
+        m2_line = M2.reshape(M2.size)
+        loss = 0
+        for i in range(len(m1_line)):
+            if m1_line[i] >= 0 and m2_line[i] >= 0:
+                loss += (m1_line[i] - m2_line[i]) ** 2
+        return loss
+
+
+    def GD(self, measured, init, limit = 1000, thresh = 1e-10):
+        # Perform a gradient descent update given a measurements matrix and some
+        # initialization. This will either be a random initialization or
+        # something based on the previous values.
+
+        guess_points = np.copy(init)
+        num_points = len(guess_points)
+        itercount = 0
+        loss = 0 # I wish ...
+        while itercount < limit:
+            measured_guess = squareform(scipy_pdist(guess_points))
+            gradients = np.zeros(guess_points.shape, dtype=np.double)
+            for i, xi in enumerate(guess_points):
+                skip_count = 0
+                for j, xj in enumerate(guess_points):
+                    # Abuse the fact that the distance between a point and
+                    # itself is zero, so we can skip this case.
+                    if i == j: continue
+                    if measured[i][j] < 0:
+                        # This wasn't able to be measured, so we'll attempt to
+                        # compensate by first skipping the gradient entirely.
+                        # Otherwise, perhaps scale by however many we're
+                        # missing, though that's not going to be correct too.
+                        skip_count += 1
+                        continue
+
+                    diff = xi - xj
+                    gradients[i] += (
+                        -2 *
+                        (measured[i][j] - measured_guess[i][j]) * 
+                        (diff / self.norm(diff))
+                    )
+                gradients[i] *= 2 # Correctness
+                gradients[i] *= num_points / (num_points - skip_count)
+
+            guess_points -= .005 * gradients
+            # loss = np.power(measured - measured_guess, 2).sum()
+            loss = self.distance_loss(measured, measured_guess)
+            if loss < thresh:
+                break
+            itercount += 1
+        return (guess_points, loss)
 
     def solve(self):
         distances = []
@@ -173,7 +229,7 @@ class PointSolver(object):
             # something for the beacon estimates.
             if len(beacons) < 3:
                 print("Terminating solve, not enough beacons!")
-                time.sleep(1)
+                self.data_delay()
                 continue
             
             start_time = time.time()
@@ -200,19 +256,19 @@ class PointSolver(object):
             labels = np.array(labels, dtype=np.bool)
             measured = measured[labels][:, labels]
           
-            # # Also make sure that there are enough actual beacons. 
-            # if len(measured) < 3:
-                # time.sleep(1)
-                # continue
-
             # Make sure we have enough valid datapoints to come to a good
-            # solution.
-            num_valid = (measured >= 0).astype(int).sum()
-            print("Number of valid measurements:", num_valid)
-            if num_valid / measured.size < .5: continue
+            # solution. We'll do this by checking that there are at least 3
+            # valid points for each.
+            valid_cols = (measured >= 0).astype(int).sum(0)
+            # valid = (measured >= 0).astype(int).sum(1).all()
+            # num_valid = (measured >= 0).astype(int).sum()
+            print("Number of valid measurements:", valid_cols)
+            # if num_valid / measured.size < .5:
+            if not (valid_cols >= 3).all():
+                self.data_delay()
+                continue
             print("There are enough valid points to process the measurements!")
             self.print_measurements(distances, labels)
-
 
             # Now we have a matrix very similar to the one we were using in math
             # test. There are a series of pairwise distances between some
@@ -222,43 +278,29 @@ class PointSolver(object):
             # appropriately.
             num_points = len(measured)
             if self._guess is not None and len(self._guess) == num_points:
+                # Just update based on the previous iteration
                 guess_points = self._guess
+                guess_points, loss = self.GD(measured, guess_points)
+
             else:
-                guess_points = np.random.random((num_points,
-                    3)).astype(np.double)
+                # Pick the best loss over a few iterations.
+                average_dist = np.average(measured)
+                loss = None
+                guess_points = None 
+                for i in range(10):
+                    gp = np.random.random((num_points,
+                        3)).astype(np.double) * average_dist
+                    gp, l = self.GD(measured, gp)
+                    if loss is None or l < loss:
+                        loss = l 
+                        guess_points = gp
 
-            itercount = 0
-            while itercount < 1000:
-                measured_guess = squareform(scipy_pdist(guess_points))
-                gradients = np.zeros(guess_points.shape, dtype=np.double)
-                for i, xi in enumerate(guess_points):
-                    for j, xj in enumerate(guess_points):
-                        # Abuse the fact that the distance between a point and
-                        # itself is zero, so we can skip this case.
-                        if i == j: continue
-                        if measured[i][j] < 0:
-                            # This wasn't able to be measured, so we'll attempt to
-                            # compensate by first skipping the gradient entirely.
-                            # Otherwise, perhaps scale by however many we're
-                            # missing, though that's not going to be correct too.
-                            continue
-
-                        diff = xi - xj
-                        gradients[i] += (
-                            -2 *
-                            (measured[i][j] - measured_guess[i][j]) * 
-                            (diff / self.norm(diff))
-                        )
-                    gradients[i] *= 2 # Correctness
-                guess_points -= .01 * gradients
-                if np.power(measured - measured_guess, 2).sum() < 1e-10:
-                    break
-                itercount += 1
-
+            print("Loss:", loss)
+            measured_guess = squareform(scipy_pdist(guess_points))
             self._guess = guess_points
 
-            print("Measured distances", measured)
-            print("Guessed measurements", measured_guess)
+            # print("Measured distances", measured)
+            # print("Guessed measurements", measured_guess)
             self.plot(guess_points)
 
             time.sleep(max(1 - (time.time() - start_time), 0))
