@@ -187,11 +187,6 @@ int main(void)
                 /* Retrieve poll reception timestamp. */
                 poll_rx_ts = get_rx_timestamp_u64();
                 
-                /*
-                printf("---------------------------------\n");
-                printf("msg1_rx: %llu\n", poll_rx_ts);
-                */
-
                 /* Set send time for response. See NOTE 9 below. */
                 //resp_tx_time = (poll_rx_ts + (POLL_RX_TO_RESP_TX_DLY_UUS * UUS_TO_DWT_TIME)) >> 8;
                 //dwt_setdelayedtrxtime(resp_tx_time * 2);
@@ -251,18 +246,6 @@ int main(void)
                         final_msg_get_ts(&rx_buffer[FINAL_MSG_RESP_RX_TS_IDX], &resp_rx_ts);
                         final_msg_get_ts(&rx_buffer[FINAL_MSG_FINAL_TX_TS_IDX], &final_tx_ts);
                         
-                        /*
-                        printf("---------------------------------------------------------------------");
-                        printf("Init device timestamps:\n");
-                        printf("Tx1: %llu\n", poll_tx_ts);
-                        printf("Rx: %llu\n", resp_rx_ts);
-                        printf("Tx2: %llu\n", final_tx_ts);
-                        printf("Resp device timestamps:\n");
-                        printf("Rx1: %llu\n", poll_rx_ts);
-                        printf("Tx: %llu\n", resp_tx_ts);
-                        printf("Rx2: %llu\n", final_rx_ts);
-                        */
-
                         /* Compute time of flight. 32-bit subtractions give correct answers even if clock has wrapped. See NOTE 12 below. */
                         poll_rx_ts_32 = (uint32)poll_rx_ts;
                         resp_tx_ts_32 = (uint32)resp_tx_ts;
@@ -287,9 +270,6 @@ int main(void)
 
                             dist_buf_idx = 0;
                         }
-
-                        /* Display computed distance on LCD. */
-                        //printf("DIST: %3.2f m\n", distance);
                     }
                 }
                 else
