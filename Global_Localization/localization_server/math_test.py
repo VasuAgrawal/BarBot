@@ -52,10 +52,11 @@ def step():
 
 # Triangle
 # ref_points = np.array([[0, 0], [1, 0], [0, 1]], dtype=np.double)
-# A simple cube
+# A spiky crown or something
 # ref_points = np.array([[66, 200, 0], [165, 240, 0], [133, 315, 0], 
     # [233, 253, 0], [266, 315, 0], [261, 228, 0], [333, 200, 0], [266, 84, 0],
     # [195, 124, 0], [122, 82, 0], [151, 182, 0]], dtype=np.double)
+# A simple cube
 ref_points = np.array([[1, -1, -1], [1, 1, -1], [-1, 1, -1], [-1, -1, -1],
     [-1, -1, 1], [1, -1, 1], [1, 1, 1], [-1, 1, 1]], dtype=np.double)
 

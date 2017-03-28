@@ -59,7 +59,7 @@ class PointSolver(object):
 
     def print_measurements(self, measurements, labels = None):
         if measurements:
-            # print("Measurements")
+            print("Measurements following:")
             console_size = shutil.get_terminal_size((80, 40))
             # Fit the mesurements nicely into columns.
             left_width = 0
@@ -168,8 +168,11 @@ class PointSolver(object):
                 distances = copy.deepcopy(self._distances)
                 mapping = copy.deepcopy(self._mapping)
                 beacons = copy.deepcopy(self._beacons)
-            
-            if len(distances) < 3:
+           
+            # First, make sure that there are enough distances to come up with
+            # something for the beacon estimates.
+            if len(beacons) < 3:
+                print("Terminating solve, not enough beacons!")
                 time.sleep(1)
                 continue
             
@@ -196,6 +199,19 @@ class PointSolver(object):
                 labels[mapping[key]] = key in beacons
             labels = np.array(labels, dtype=np.bool)
             measured = measured[labels][:, labels]
+          
+            # # Also make sure that there are enough actual beacons. 
+            # if len(measured) < 3:
+                # time.sleep(1)
+                # continue
+
+            # Make sure we have enough valid datapoints to come to a good
+            # solution.
+            num_valid = (measured >= 0).astype(int).sum()
+            print("Number of valid measurements:", num_valid)
+            if num_valid / measured.size < .5: continue
+            print("There are enough valid points to process the measurements!")
+            self.print_measurements(distances, labels)
 
 
             # Now we have a matrix very similar to the one we were using in math
@@ -208,7 +224,8 @@ class PointSolver(object):
             if self._guess is not None and len(self._guess) == num_points:
                 guess_points = self._guess
             else:
-                guess_points = np.random.random((num_points, 3)).astype(np.double)
+                guess_points = np.random.random((num_points,
+                    3)).astype(np.double)
 
             itercount = 0
             while itercount < 1000:
@@ -240,9 +257,8 @@ class PointSolver(object):
 
             self._guess = guess_points
 
-            self.print_measurements(distances, labels)
-            print(measured)
-            print(measured_guess)
+            print("Measured distances", measured)
+            print("Guessed measurements", measured_guess)
             self.plot(guess_points)
 
             time.sleep(max(1 - (time.time() - start_time), 0))
