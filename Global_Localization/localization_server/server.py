@@ -56,6 +56,7 @@ class PointSolver(object):
         self._beacons = set()
         self._data_lock = threading.Lock()
         self._guess = None
+        self._guess_tags = None
 
     def print_measurements(self, measurements, labels = None):
         if measurements:
@@ -138,14 +139,16 @@ class PointSolver(object):
 
 
 
-    def plot(self, guess_points):
+    def plot(self, guess_points, tags):
         plt.ion()
         xmin = guess_points[:, 0].min()
         ymin = guess_points[:, 1].min()
         xmax = guess_points[:, 0].max()
         ymax = guess_points[:, 1].max()
 
-        guess_wrap = np.vstack((guess_points, guess_points[0]))
+        ids = tags.argsort()
+        points = guess_points[ids, :]
+        guess_wrap = np.vstack((points, points[0]))
 
         ref_fig = plt.figure(1)
         plt.clf()
@@ -251,9 +254,12 @@ class PointSolver(object):
             # to be beacons.
             measured = np.array(distances)
             labels = [False] * len(mapping)
+            tags = [0] * len(mapping)
             for key in mapping:
                 labels[mapping[key]] = key in beacons
+                tags[mapping[key]] = key
             labels = np.array(labels, dtype=np.bool)
+            tags = np.array(tags, dtype=int)
             measured = measured[labels][:, labels]
           
             # Make sure we have enough valid datapoints to come to a good
@@ -298,11 +304,9 @@ class PointSolver(object):
             print("Loss:", loss)
             measured_guess = squareform(scipy_pdist(guess_points))
             self._guess = guess_points
+            self._guess_tags = tags
 
-            # print("Measured distances", measured)
-            # print("Guessed measurements", measured_guess)
-            self.plot(guess_points)
-
+            self.plot(guess_points, tags)
             time.sleep(max(1 - (time.time() - start_time), 0))
 
 
