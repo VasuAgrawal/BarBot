@@ -103,6 +103,22 @@ int main(void)
     dwt_setinterrupt(DWT_INT_TFRS, 1);
     dwt_setcallbacks(txDoneISR, NULL, NULL, NULL);
 
+    while(1)
+    {
+        /* Write frame data to DW1000 and prepare transmission. See NOTE 4 below.*/
+        dwt_writetxdata(sizeof(tx_msg), tx_msg, 0); /* Zero offset in TX buffer. */
+        dwt_writetxfctrl(sizeof(tx_msg), 0, 0); /* Zero offset in TX buffer, no ranging. */
+
+        /* Start transmission. */
+        dwt_starttx(DWT_START_TX_IMMEDIATE);
+
+        /* Execute a delay between transmissions. */
+        deca_sleep(TX_DELAY_MS);
+
+        /* Increment the blink frame sequence number (modulo 256). */
+        tx_msg[BLINK_FRAME_SN_IDX]++;
+    }
+
     /* Loop forever sending frames periodically. */
     std::thread txThread(sendPeriodicMessages);
     txThread.join();

@@ -114,6 +114,8 @@ int main(void)
     /* Activate reception immediately. See NOTE 3 below. */
     dwt_rxenable(DWT_START_RX_IMMEDIATE);
 
+    while(1);
+
     /* Loop forever receiving frames. */
     std::thread rxThread(delayThread);
     rxThread.join();
