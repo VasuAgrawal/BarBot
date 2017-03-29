@@ -77,12 +77,6 @@ void rxGoodISR(const dwt_cb_data_t *cbData) {
     dwt_rxenable(DWT_START_RX_IMMEDIATE);
 }
 
-void delayThread() {
-    while(1) {
-        deca_sleep(1000);
-    }
-}
-
 /**
  * Application entry point.
  */
@@ -115,10 +109,6 @@ int main(void)
     dwt_rxenable(DWT_START_RX_IMMEDIATE);
 
     while(1);
-
-    /* Loop forever receiving frames. */
-    std::thread rxThread(delayThread);
-    rxThread.join();
 }
 
 /*****************************************************************************************************************************************************

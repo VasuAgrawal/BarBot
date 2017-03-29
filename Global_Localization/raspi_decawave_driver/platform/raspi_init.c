@@ -17,7 +17,7 @@
 #include "raspi_init.h"
 
 /** @brief Flag for masking interrupts - used in decamutex */
-int DECA_MUTEX_FLAG;
+volatile int DECA_MUTEX_FLAG;
 
 int piHandle;
 
@@ -26,7 +26,6 @@ int piHandle;
  * @brief Interrupt handler for the Decawave chip
  */
 void DECAWAVE_RPI_ISR(int pi, unsigned user_gpio, unsigned level, uint32_t tick) {
-    printf("isr\n");
     if (DECA_MUTEX_FLAG == 1) {
         dwt_isr();
     }
