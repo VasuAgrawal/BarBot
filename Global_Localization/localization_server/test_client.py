@@ -23,10 +23,12 @@ def pdist(X):
 pairwise = pdist(ref_points)
 
 def my_callback(stream):
+    iterations = 0
     while True:
         for send_idx, line in enumerate(pairwise):
             for recv_idx, dist in enumerate(line):
                 if send_idx == recv_idx: continue
+                if dist > iterations * 10: continue
                 message = DwDistance()
                 message.send_id = send_idx
                 message.recv_id = recv_idx
@@ -36,6 +38,7 @@ def my_callback(stream):
                 data = packet.make_packet_from_bytes(message.SerializeToString())
                 stream.write(data)
 
+        iterations += 1
         time.sleep(1)
 
 
