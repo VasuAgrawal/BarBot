@@ -56,8 +56,10 @@ void raspiDecawaveInit() {
     // Defaults to interrupt on a rising edge (Decawave chip IRQ polarity is
     // default active high)
     DECA_MUTEX_FLAG = 1; // Interrupts "enabled"
+    /*
     if (callback(piHandle, DWM_INTERRUPT_PIN, RISING_EDGE, DECAWAVE_RPI_ISR) < 0) {
         printf("Failed to initialize callback!\n");
         exit(EXIT_FAILURE);
     }
+    */
 }

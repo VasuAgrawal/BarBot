@@ -77,6 +77,15 @@ void rxGoodISR(const dwt_cb_data_t *cbData) {
     dwt_rxenable(DWT_START_RX_IMMEDIATE);
 }
 
+void pollThread(int interrupts) {
+    /* Enable "interrupt-based" functionality by polling in this thread and calling dwt_isr to perform the appropriate callback */
+    int status;
+    while (1) {
+        while (!((status_reg = dwt_read32bitreg(SYS_STATUS_ID)) & interrupts));
+        dwt_isr();
+    }
+}
+
 /**
  * Application entry point.
  */
@@ -103,12 +112,13 @@ int main(void)
 
     /* Set up interrupt handlers */
     dwt_setcallbacks(NULL, rxGoodISR, NULL, rxErrorISR);
-    dwt_setinterrupt(DWT_INT_RFCG | DWT_INT_RFCE | DWT_INT_RPHE, 1);
+    //dwt_setinterrupt(DWT_INT_RFCG | DWT_INT_RFCE | DWT_INT_RPHE, 1);
 
     /* Activate reception immediately. See NOTE 3 below. */
     dwt_rxenable(DWT_START_RX_IMMEDIATE);
 
-    while(1);
+    std::thread pollingThread(pollThread);
+    pollThread.join();
 }
 
 /*****************************************************************************************************************************************************
