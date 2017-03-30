@@ -206,10 +206,13 @@ int main(void)
     /* Loop forever initiating ranging exchanges. */
     while (1)
     {
-        computeDistanceInit();
-
-        /* Execute a delay between ranging exchanges. */
-        deca_sleep(RNG_DELAY_MS);
+        printf("Starting Configuration 1\n");
+        for (int i = 0; i < 10; i++) {
+            computeDistanceInit();
+            deca_sleep(RNG_DELAY_MS);
+        }
+        printf("Finished Configuration 1\n");
+        break;
     }
 }
 
