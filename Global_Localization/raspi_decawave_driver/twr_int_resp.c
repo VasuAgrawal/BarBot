@@ -142,6 +142,7 @@ void rxGoodISR(const dwt_cb_data_t *cbData) {
     rx_buffer[ALL_MSG_SN_IDX] = 0;
     if (memcmp(rx_buffer, rx_poll_msg, ALL_MSG_COMMON_LEN) == 0)
     {
+        printf("Received initial, sending ack\n");
         uint32 resp_tx_time;
         int ret;
 
@@ -166,6 +167,7 @@ void rxGoodISR(const dwt_cb_data_t *cbData) {
      * As the sequence number field of the frame is not used in this example, it can be zeroed to ease the validation of the frame. */
     else if (memcmp(rx_buffer, rx_final_msg, ALL_MSG_COMMON_LEN) == 0)
     {
+        printf("Received final, computing distance\n");
         uint32 poll_tx_ts, resp_rx_ts, final_tx_ts;
         uint32 poll_rx_ts_32, resp_tx_ts_32, final_rx_ts_32;
         double Ra, Rb, Da, Db;
@@ -207,6 +209,16 @@ void rxGoodISR(const dwt_cb_data_t *cbData) {
     }
 }
 
+void pollThread() {
+    /* Enable "interrupt-based" functionality by polling in this thread and calling dwt_isr to perform the appropriate callback */
+    int status;
+    int interrupts = SYS_STATUS_RXFCE | SYS_STATUS_RXFCG | SYS_STATUS_RXRFSL | SYS_STATUS_RXPHE | SYS_STATUS_TXFRS;
+    while (1) {
+        while (!((status_reg = dwt_read32bitreg(SYS_STATUS_ID)) & interrupts));
+        dwt_isr();
+    }
+}
+
 /*! ------------------------------------------------------------------------------------------------------------------
  * @fn main()
  *
@@ -243,10 +255,12 @@ int main(void)
 
     /* Set up interrupt handlers */
     dwt_setcallbacks(txDoneISR, rxGoodISR, NULL, rxErrorISR);
-    dwt_setinterrupt(DWT_INT_RFCG | DWT_INT_RFCE | DWT_INT_RPHE | DWT_INT_TFRS, 1);
+    //dwt_setinterrupt(DWT_INT_RFCG | DWT_INT_RFCE | DWT_INT_RPHE | DWT_INT_TFRS, 1);
 
     /* Set preamble timeout for expected frames. See NOTE 6 below. */
     //dwt_setpreambledetecttimeout(PRE_TIMEOUT);
+
+    std::thread pollingThread(pollThread);
 
     /* Loop forever responding to ranging requests. */
     while (1)

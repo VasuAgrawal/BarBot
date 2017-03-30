@@ -28,7 +28,7 @@
 #define APP_NAME "DS TWR INIT v1.2"
 
 /* Inter-ranging delay period, in milliseconds. */
-#define RNG_DELAY_MS 1000
+#define RNG_DELAY_MS 100
 
 /* Default communication configuration. We use here EVK1000's default mode (mode 3). */
 static dwt_config_t config = {
@@ -99,6 +99,7 @@ static uint64 get_rx_timestamp_u64(void);
 static void final_msg_set_ts(uint8 *ts_field, uint64 ts);
 
 void txDoneISR(const dwt_cb_data_t *cbData) {
+	printf("Sent initial\n");
     /* Clear TX frame sent event. */
     dwt_write32bitreg(SYS_STATUS_ID, SYS_STATUS_TXFRS);
 }
@@ -130,6 +131,7 @@ void rxGoodISR(const dwt_cb_data_t *cbData) {
     rx_buffer[ALL_MSG_SN_IDX] = 0;
     if (memcmp(rx_buffer, rx_resp_msg, ALL_MSG_COMMON_LEN) == 0)
     {
+    	printf("Received ack, sending final\n");
         uint32 final_tx_time;
         int ret;
 
@@ -154,6 +156,16 @@ void rxGoodISR(const dwt_cb_data_t *cbData) {
         dwt_writetxdata(sizeof(tx_final_msg), tx_final_msg, 0); /* Zero offset in TX buffer. */
         dwt_writetxfctrl(sizeof(tx_final_msg), 0, 1); /* Zero offset in TX buffer, ranging. */
         ret = dwt_starttx(DWT_START_TX_DELAYED);
+    }
+}
+
+void pollThread() {
+    /* Enable "interrupt-based" functionality by polling in this thread and calling dwt_isr to perform the appropriate callback */
+    int status;
+    int interrupts = SYS_STATUS_RXFCE | SYS_STATUS_RXFCG | SYS_STATUS_RXRFSL | SYS_STATUS_RXPHE | SYS_STATUS_TXFRS;
+    while (1) {
+        while (!((status_reg = dwt_read32bitreg(SYS_STATUS_ID)) & interrupts));
+        dwt_isr();
     }
 }
 
@@ -193,7 +205,9 @@ int main(void)
 
     /* Set up interrupt handlers */
     dwt_setcallbacks(txDoneISR, rxGoodISR, NULL, rxErrorISR);
-    dwt_setinterrupt(DWT_INT_RFCG | DWT_INT_RFCE | DWT_INT_RPHE | DWT_INT_TFRS, 1);
+    //dwt_setinterrupt(DWT_INT_RFCG | DWT_INT_RFCE | DWT_INT_RPHE | DWT_INT_TFRS, 1);
+
+    std::thread pollingThread(pollThread);
 
     /* Loop forever initiating ranging exchanges. */
     while (1)
