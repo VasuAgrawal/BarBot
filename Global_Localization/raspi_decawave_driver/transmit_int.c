@@ -10,8 +10,6 @@
  *
  * @author Decawave
  */
-#include <wiringPi.h>
-#include <wiringPiSPI.h>
 #include <stdio.h>
 #include <deca_device_api.h>
 #include <deca_regs.h>
@@ -53,6 +51,16 @@ void txDoneISR(const dwt_cb_data_t *cbData) {
     dwt_write32bitreg(SYS_STATUS_ID, SYS_STATUS_TXFRS);
 }
 
+void pollThread() {
+    /* Enable "interrupt-based" functionality by polling in this thread and calling dwt_isr to perform the appropriate callback */
+    int status;
+    int interrupts = SYS_STATUS_TXFRS;
+    while (1) {
+        while (!((status = dwt_read32bitreg(SYS_STATUS_ID)) & interrupts));
+        dwt_isr();
+    }
+}
+
 /**
  * Application entry point.
  */
@@ -78,8 +86,10 @@ int main(void)
     printf("DWM1000: Device ID %x\n", deviceId);
 
     /* Set up interrupts */
-    dwt_setinterrupt(DWT_INT_TFRS, 1);
+    //dwt_setinterrupt(DWT_INT_TFRS, 1);
     dwt_setcallbacks(txDoneISR, NULL, NULL, NULL);
+
+    std::thread pollingThread(pollThread);
 
     while(1)
     {

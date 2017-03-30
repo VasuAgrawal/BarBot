@@ -10,8 +10,7 @@
  *
  * @author Decawave
  */
-#include <wiringPi.h>
-#include <wiringPiSPI.h>
+
 #include <stdio.h>
 #include <deca_device_api.h>
 #include <deca_regs.h>
@@ -77,9 +76,10 @@ void rxGoodISR(const dwt_cb_data_t *cbData) {
     dwt_rxenable(DWT_START_RX_IMMEDIATE);
 }
 
-void pollThread(int interrupts) {
+void pollThread() {
     /* Enable "interrupt-based" functionality by polling in this thread and calling dwt_isr to perform the appropriate callback */
     int status;
+    int interrupts = SYS_STATUS_RXFCE | SYS_STATUS_RXFCG | SYS_STATUS_RXRFSL | SYS_STATUS_RXPHE;
     while (1) {
         while (!((status_reg = dwt_read32bitreg(SYS_STATUS_ID)) & interrupts));
         dwt_isr();
@@ -118,7 +118,7 @@ int main(void)
     dwt_rxenable(DWT_START_RX_IMMEDIATE);
 
     std::thread pollingThread(pollThread);
-    pollThread.join();
+    pollingThread.join();
 }
 
 /*****************************************************************************************************************************************************

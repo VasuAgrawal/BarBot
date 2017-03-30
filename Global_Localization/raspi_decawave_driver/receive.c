@@ -10,8 +10,6 @@
  *
  * @author Decawave
  */
-#include <wiringPi.h>
-#include <wiringPiSPI.h>
 #include <stdio.h>
 #include <deca_device_api.h>
 #include <deca_regs.h>
