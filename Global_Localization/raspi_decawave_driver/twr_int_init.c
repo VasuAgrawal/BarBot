@@ -23,6 +23,7 @@
 #include <deca_regs.h>
 #include <raspi_init.h>
 #include <string.h>
+#include <thread>
 
 /* Example application name and version to display on LCD screen. */
 #define APP_NAME "DS TWR INIT v1.2"

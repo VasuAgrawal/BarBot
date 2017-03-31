@@ -117,6 +117,7 @@ void computeDistanceInit() {
 
     if (status_reg & SYS_STATUS_RXFCG) {
         /* Received ack. */
+        uint32 frame_len;
 
         /* Clear good RX frame event and TX frame sent in the DW1000 status register. */
         dwt_write32bitreg(SYS_STATUS_ID, SYS_STATUS_RXFCG | SYS_STATUS_TXFRS);
