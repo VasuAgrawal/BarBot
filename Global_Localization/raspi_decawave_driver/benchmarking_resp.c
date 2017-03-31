@@ -29,7 +29,7 @@
 
 /* Default communication configuration. We use here EVK1000's default mode (mode 3). */
 static dwt_config_t config = {
-    2,               /* Channel number. */
+    1,               /* Channel number. */
     DWT_PRF_64M,     /* Pulse repetition frequency. */
     DWT_PLEN_1024,   /* Preamble length. Used in TX only. */
     DWT_PAC32,       /* Preamble acquisition chunk size. Used in RX only. */
@@ -280,8 +280,22 @@ int main(void)
     /* Loop forever responding to ranging requests. */
     while (1)
     {
-        computeDistanceResp();
-        printf("%3.5f\n", distance);
+        printf("Configuration 1\n");
+        for (int i = 0; i < 10; i++) {
+            computeDistanceResp();
+            printf("%3.5f\n", distance);
+        }
+
+        config.chan = 2;
+        dwt_forcetrxoff();
+        dwt_configure(&config);
+
+        printf("Configuration 2\n");
+        for (i = 0; i < 10; i++) {
+            computeDistanceResp();
+            printf("%3.5f\n", distance);
+        }
+        
     }
 }
 
