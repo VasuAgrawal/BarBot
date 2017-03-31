@@ -334,34 +334,34 @@ static void set_msg_addresses(uint8 master_addr, uint8 slave_addr) {
 	tx_poll_msg[MSG_SRC_ADDR] = master_addr;
 	tx_poll_msg[MSG_SRC_ADDR+1] = master_addr;
 	tx_poll_msg[MSG_DEST_ADDR] = slave_addr;
-	tx_poll_masg[MSG_DEST_ADDR+1] = slave_addr;
+	tx_poll_msg[MSG_DEST_ADDR+1] = slave_addr;
 
 	rx_poll_msg[MSG_SRC_ADDR] = master_addr;
 	rx_poll_msg[MSG_SRC_ADDR+1] = master_addr;
 	rx_poll_msg[MSG_DEST_ADDR] = slave_addr;
-	rx_poll_masg[MSG_DEST_ADDR+1] = slave_addr;
+	rx_poll_msg[MSG_DEST_ADDR+1] = slave_addr;
 
 	/* Response message addresses */
 	tx_resp_msg[MSG_SRC_ADDR] = slave_addr;
 	tx_resp_msg[MSG_SRC_ADDR+1] = slave_addr;
 	tx_resp_msg[MSG_DEST_ADDR] = master_addr;
-	tx_resp_masg[MSG_DEST_ADDR+1] = master_addr;
+	tx_resp_msg[MSG_DEST_ADDR+1] = master_addr;
 
 	rx_resp_msg[MSG_SRC_ADDR] = slave_addr;
 	rx_resp_msg[MSG_SRC_ADDR+1] = slave_addr;
 	rx_resp_msg[MSG_DEST_ADDR] = master_addr;
-	rx_resp_masg[MSG_DEST_ADDR+1] = master_addr;
+	rx_resp_msg[MSG_DEST_ADDR+1] = master_addr;
 
 	/* Final message addresses */
 	tx_final_msg[MSG_SRC_ADDR] = master_addr;
 	tx_final_msg[MSG_SRC_ADDR+1] = master_addr;
 	tx_final_msg[MSG_DEST_ADDR] = slave_addr;
-	tx_final_masg[MSG_DEST_ADDR+1] = slave_addr;
+	tx_final_msg[MSG_DEST_ADDR+1] = slave_addr;
 
 	rx_final_msg[MSG_SRC_ADDR] = master_addr;
 	rx_final_msg[MSG_SRC_ADDR+1] = master_addr;
 	rx_final_msg[MSG_DEST_ADDR] = slave_addr;
-	rx_final_masg[MSG_DEST_ADDR+1] = slave_addr;
+	rx_final_msg[MSG_DEST_ADDR+1] = slave_addr;
 }
 
 /*****************************************************************************************************************************************************
