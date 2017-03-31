@@ -270,73 +270,46 @@ void computeDistanceResp() {
                 printf("Error transmitting response frame\n");
                 return ;
             }
+        }
+        /* Check that the frame is a final message sent by "DS TWR initiator" example. */
+        else if (memcmp(rx_buffer, rx_final_msg, ALL_MSG_COMMON_LEN) == 0) {
+            uint32 poll_tx_ts, resp_rx_ts, final_tx_ts;
+            uint32 poll_rx_ts_32, resp_tx_ts_32, final_rx_ts_32;
+            double Ra, Rb, Da, Db;
+            int64 tof_dtu;
 
-            /* Poll for reception of expected "final" frame or error/timeout. See NOTE 8 below. */
-            while (!((status_reg = dwt_read32bitreg(SYS_STATUS_ID)) & (SYS_STATUS_RXFCG | SYS_STATUS_ALL_RX_TO | SYS_STATUS_ALL_RX_ERR)));
+            /* Retrieve response transmission and final reception timestamps. */
+            resp_tx_ts = get_tx_timestamp_u64();
+            final_rx_ts = get_rx_timestamp_u64();
 
-            /* Increment frame sequence number after transmission of the response message (modulo 256). */
-            frame_seq_nb++;
+            /* Get timestamps embedded in the final message. */
+            final_msg_get_ts(&rx_buffer[FINAL_MSG_POLL_TX_TS_IDX], &poll_tx_ts);
+            final_msg_get_ts(&rx_buffer[FINAL_MSG_RESP_RX_TS_IDX], &resp_rx_ts);
+            final_msg_get_ts(&rx_buffer[FINAL_MSG_FINAL_TX_TS_IDX], &final_tx_ts);
+            
+            /* Compute time of flight. 32-bit subtractions give correct answers even if clock has wrapped. See NOTE 12 below. */
+            poll_rx_ts_32 = (uint32)poll_rx_ts;
+            resp_tx_ts_32 = (uint32)resp_tx_ts;
+            final_rx_ts_32 = (uint32)final_rx_ts;
+            Ra = (double)(resp_rx_ts - poll_tx_ts);
+            Rb = (double)(final_rx_ts_32 - resp_tx_ts_32);
+            Da = (double)(final_tx_ts - resp_rx_ts);
+            Db = (double)(resp_tx_ts_32 - poll_rx_ts_32);
+            tof_dtu = (int64)((Ra * Rb - Da * Db) / (Ra + Rb + Da + Db));
 
-            if (status_reg & SYS_STATUS_RXFCG) {
-                /* Clear good RX frame event and TX frame sent in the DW1000 status register. */
-                dwt_write32bitreg(SYS_STATUS_ID, SYS_STATUS_RXFCG | SYS_STATUS_TXFRS);
+            tof = tof_dtu * DWT_TIME_UNITS;
+            distance = tof * SPEED_OF_LIGHT;
 
-                /* A frame has been received, read it into the local buffer. */
-                frame_len = dwt_read32bitreg(RX_FINFO_ID) & RX_FINFO_RXFLEN_MASK;
-                if (frame_len <= RX_BUF_LEN) {
-                    dwt_readrxdata(rx_buffer, frame_len, 0);
+            dist_buf[dist_buf_idx++] = distance;
+            if (dist_buf_idx == 10) {
+                // Compute average and print distance
+                float dist_sum = 0.f;
+                for (int i = 0; i < 10; i++) {
+                    dist_sum += dist_buf[i];
                 }
-                
-                /* Check that the frame is a final message sent by "DS TWR initiator" example.
-                 * As the sequence number field of the frame is not used in this example, it can be zeroed to ease the validation of the frame. */
-                rx_buffer[ALL_MSG_SN_IDX] = 0;
-                if (memcmp(rx_buffer, rx_final_msg, ALL_MSG_COMMON_LEN) == 0) {
-                    uint32 poll_tx_ts, resp_rx_ts, final_tx_ts;
-                    uint32 poll_rx_ts_32, resp_tx_ts_32, final_rx_ts_32;
-                    double Ra, Rb, Da, Db;
-                    int64 tof_dtu;
+                printf("%3.2f\n", dist_sum / 10.0);
 
-                    /* Retrieve response transmission and final reception timestamps. */
-                    resp_tx_ts = get_tx_timestamp_u64();
-                    final_rx_ts = get_rx_timestamp_u64();
-
-                    /* Get timestamps embedded in the final message. */
-                    final_msg_get_ts(&rx_buffer[FINAL_MSG_POLL_TX_TS_IDX], &poll_tx_ts);
-                    final_msg_get_ts(&rx_buffer[FINAL_MSG_RESP_RX_TS_IDX], &resp_rx_ts);
-                    final_msg_get_ts(&rx_buffer[FINAL_MSG_FINAL_TX_TS_IDX], &final_tx_ts);
-                    
-                    /* Compute time of flight. 32-bit subtractions give correct answers even if clock has wrapped. See NOTE 12 below. */
-                    poll_rx_ts_32 = (uint32)poll_rx_ts;
-                    resp_tx_ts_32 = (uint32)resp_tx_ts;
-                    final_rx_ts_32 = (uint32)final_rx_ts;
-                    Ra = (double)(resp_rx_ts - poll_tx_ts);
-                    Rb = (double)(final_rx_ts_32 - resp_tx_ts_32);
-                    Da = (double)(final_tx_ts - resp_rx_ts);
-                    Db = (double)(resp_tx_ts_32 - poll_rx_ts_32);
-                    tof_dtu = (int64)((Ra * Rb - Da * Db) / (Ra + Rb + Da + Db));
-
-                    tof = tof_dtu * DWT_TIME_UNITS;
-                    distance = tof * SPEED_OF_LIGHT;
-
-                    dist_buf[dist_buf_idx++] = distance;
-                    if (dist_buf_idx == 10) {
-                        // Compute average and print distance
-                        float dist_sum = 0.f;
-                        for (int i = 0; i < 10; i++) {
-                            dist_sum += dist_buf[i];
-                        }
-                        printf("%3.2f\n", dist_sum / 10.0);
-
-                        dist_buf_idx = 0;
-                    }
-                }
-            }
-            else {
-                /* Clear RX error/timeout events in the DW1000 status register. */
-                dwt_write32bitreg(SYS_STATUS_ID, SYS_STATUS_ALL_RX_TO | SYS_STATUS_ALL_RX_ERR);
-
-                /* Reset RX to properly reinitialise LDE operation. */
-                dwt_rxreset();
+                dist_buf_idx = 0;
             }
         }
     }
