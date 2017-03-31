@@ -322,7 +322,7 @@ int main(int argc, char *argv[])
     /* Loop forever responding to ranging requests. */
     while (1)
     {
-        for (int i = 0; i < 10; i++) {
+        for (int i = 0; i < 50; i++) {
             computeDistanceResp();
             printf("%3.5f\n", distance);
         }
