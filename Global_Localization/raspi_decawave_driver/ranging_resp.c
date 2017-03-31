@@ -119,17 +119,15 @@ static void final_msg_get_ts(const uint8 *ts_field, uint32 *ts);
  */
 void computeDistanceResp() {
     /* Clear reception timeout to start next ranging process. */
-    dwt_setrxtimeout(0);
+    //dwt_setrxtimeout(0);
 
     /* Activate reception immediately. */
     dwt_rxenable(DWT_START_RX_IMMEDIATE);
 
     /* Poll for reception of a frame or error/timeout. See NOTE 8 below. */
-    while (!((status_reg = dwt_read32bitreg(SYS_STATUS_ID)) & (SYS_STATUS_RXFCG | SYS_STATUS_ALL_RX_TO | SYS_STATUS_ALL_RX_ERR)))
-    { };
+    while (!((status_reg = dwt_read32bitreg(SYS_STATUS_ID)) & (SYS_STATUS_RXFCG | SYS_STATUS_ALL_RX_TO | SYS_STATUS_ALL_RX_ERR)));
 
-    if (status_reg & SYS_STATUS_RXFCG)
-    {
+    if (status_reg & SYS_STATUS_RXFCG) {
         uint32 frame_len;
 
         /* Clear good RX frame event in the DW1000 status register. */
@@ -137,17 +135,15 @@ void computeDistanceResp() {
 
         /* A frame has been received, read it into the local buffer. */
         frame_len = dwt_read32bitreg(RX_FINFO_ID) & RX_FINFO_RXFL_MASK_1023;
-        if (frame_len <= RX_BUFFER_LEN)
-        {
+        if (frame_len <= RX_BUFFER_LEN) {
             dwt_readrxdata(rx_buffer, frame_len, 0);
         }
 
         /* Check that the frame is a poll sent by "DS TWR initiator" example.
          * As the sequence number field of the frame is not relevant, it is cleared to simplify the validation of the frame. */
         rx_buffer[ALL_MSG_SN_IDX] = 0;
-        if (memcmp(rx_buffer, rx_poll_msg, ALL_MSG_COMMON_LEN) == 0)
-        {
-            uint32 resp_tx_time;
+        if (memcmp(rx_buffer, rx_poll_msg, ALL_MSG_COMMON_LEN) == 0) {
+            //uint32 resp_tx_time;
             int ret;
 
             /* Retrieve poll reception timestamp. */
@@ -168,36 +164,31 @@ void computeDistanceResp() {
             ret = dwt_starttx(DWT_START_TX_IMMEDIATE | DWT_RESPONSE_EXPECTED);
 
             /* If dwt_starttx() returns an error, abandon this ranging exchange and proceed to the next one. See NOTE 11 below. */
-            if (ret == DWT_ERROR)
-            {
+            if (ret == DWT_ERROR) {
                 printf("Error transmitting response frame\n");
                 return ;
             }
 
             /* Poll for reception of expected "final" frame or error/timeout. See NOTE 8 below. */
-            while (!((status_reg = dwt_read32bitreg(SYS_STATUS_ID)) & (SYS_STATUS_RXFCG | SYS_STATUS_ALL_RX_TO | SYS_STATUS_ALL_RX_ERR)))
-            { };
+            while (!((status_reg = dwt_read32bitreg(SYS_STATUS_ID)) & (SYS_STATUS_RXFCG | SYS_STATUS_ALL_RX_TO | SYS_STATUS_ALL_RX_ERR)));
 
             /* Increment frame sequence number after transmission of the response message (modulo 256). */
             frame_seq_nb++;
 
-            if (status_reg & SYS_STATUS_RXFCG)
-            {
+            if (status_reg & SYS_STATUS_RXFCG) {
                 /* Clear good RX frame event and TX frame sent in the DW1000 status register. */
                 dwt_write32bitreg(SYS_STATUS_ID, SYS_STATUS_RXFCG | SYS_STATUS_TXFRS);
 
                 /* A frame has been received, read it into the local buffer. */
                 frame_len = dwt_read32bitreg(RX_FINFO_ID) & RX_FINFO_RXFLEN_MASK;
-                if (frame_len <= RX_BUF_LEN)
-                {
+                if (frame_len <= RX_BUF_LEN) {
                     dwt_readrxdata(rx_buffer, frame_len, 0);
                 }
                 
                 /* Check that the frame is a final message sent by "DS TWR initiator" example.
                  * As the sequence number field of the frame is not used in this example, it can be zeroed to ease the validation of the frame. */
                 rx_buffer[ALL_MSG_SN_IDX] = 0;
-                if (memcmp(rx_buffer, rx_final_msg, ALL_MSG_COMMON_LEN) == 0)
-                {
+                if (memcmp(rx_buffer, rx_final_msg, ALL_MSG_COMMON_LEN) == 0) {
                     uint32 poll_tx_ts, resp_rx_ts, final_tx_ts;
                     uint32 poll_rx_ts_32, resp_tx_ts_32, final_rx_ts_32;
                     double Ra, Rb, Da, Db;
@@ -238,8 +229,7 @@ void computeDistanceResp() {
                     }
                 }
             }
-            else
-            {
+            else {
                 /* Clear RX error/timeout events in the DW1000 status register. */
                 dwt_write32bitreg(SYS_STATUS_ID, SYS_STATUS_ALL_RX_TO | SYS_STATUS_ALL_RX_ERR);
 
@@ -248,8 +238,7 @@ void computeDistanceResp() {
             }
         }
     }
-    else
-    {
+    else {
         /* Clear RX error/timeout events in the DW1000 status register. */
         dwt_write32bitreg(SYS_STATUS_ID, SYS_STATUS_ALL_RX_TO | SYS_STATUS_ALL_RX_ERR);
 
