@@ -248,7 +248,7 @@ int main(int argc, char *argv[])
     /* Loop forever initiating ranging exchanges. */
     while (1)
     {
-        for (int i = 0; i < 10; i++) {
+        for (int i = 0; i < 50; i++) {
             computeDistanceInit();
             deca_sleep(RNG_DELAY_MS);
         }
