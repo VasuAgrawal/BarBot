@@ -19,6 +19,7 @@
  */
 
 #include <stdio.h>
+#include <stdlib.h>
 #include <deca_device_api.h>
 #include <deca_regs.h>
 #include <raspi_init.h>
@@ -249,8 +250,49 @@ void computeDistanceResp() {
  *
  * @return none
  */
-int main(void)
+int main(int argc, char *argv[])
 {
+    /* Read command line arguments. */
+    if (argc != 3) {
+        printf("Usage: [channel: 1, 2, 3, 4, 5, 7] [dataRate: 1, 2, 3]\n");
+        return -1;
+    }
+    else {
+        int channel = atoi(argv[1]);
+        int dataRate = atoi(argv[2]);
+
+        if ((channel < 0) || (channel > 7) || (channel == 6)) {
+            printf("Invalid channel\n");
+            return -1;
+        }
+        else {
+            printf("Setting channel to %d\n", channel);
+            config.chan = channel;
+        }
+        
+        if ((dataRate < 1) || (dataRate > 3)) {
+            printf("Invalid data rate\n");
+            return -1;
+        }
+        else {
+            switch(dataRate) {
+                case 1:
+                    printf("Setting data rate to 110kbps\n");
+                    config.dataRate = DWT_BR_110K;
+                    break;
+                case 2:
+                    printf("Setting data rate to 850kbps\n");
+                    config.dataRate = DWT_BR_850K;
+                    break;
+                case 3:
+                default:
+                    printf("Setting data rate to 6.8mbps\n");
+                    config.dataRate = DWT_BR_6M8;
+                    break;
+            }
+        }
+    }
+
     /* Start with board specific hardware init. */
     raspiDecawaveInit();
 
@@ -280,22 +322,62 @@ int main(void)
     /* Loop forever responding to ranging requests. */
     while (1)
     {
-        printf("Configuration 1\n");
+        for (int i = 0; i < 10; i++) {
+            computeDistanceResp();
+            printf("%3.5f\n", distance);
+        }
+        /*
+        config.chan = 2;
+        dwt_forcetrxoff();
+        dwt_configure(&config);
+
+        printf("Channel 2\n");
         for (int i = 0; i < 10; i++) {
             computeDistanceResp();
             printf("%3.5f\n", distance);
         }
 
-        config.chan = 2;
+        config.chan = 3;
         dwt_forcetrxoff();
         dwt_configure(&config);
 
-        printf("Configuration 2\n");
-        for (i = 0; i < 10; i++) {
+        printf("Channel 3\n");
+        for (int i = 0; i < 10; i++) {
             computeDistanceResp();
             printf("%3.5f\n", distance);
         }
-        
+
+        config.chan = 4;
+        dwt_forcetrxoff();
+        dwt_configure(&config);
+
+        printf("Channel 4\n");
+        for (int i = 0; i < 10; i++) {
+            computeDistanceResp();
+            printf("%3.5f\n", distance);
+        }
+
+        config.chan = 5;
+        dwt_forcetrxoff();
+        dwt_configure(&config);
+
+        printf("Channel 5\n");
+        for (int i = 0; i < 10; i++) {
+            computeDistanceResp();
+            printf("%3.5f\n", distance);
+        }
+
+        config.chan = 7;
+        dwt_forcetrxoff();
+        dwt_configure(&config);
+
+        printf("Channel 7\n");
+        for (int i = 0; i < 10; i++) {
+            computeDistanceResp();
+            printf("%3.5f\n", distance);
+        }
+        */
+        break;
     }
 }
 

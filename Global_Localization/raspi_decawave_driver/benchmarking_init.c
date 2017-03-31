@@ -217,7 +217,7 @@ int main(void)
         dwt_forcetrxoff();
         dwt_configure(&config);
 
-        for (i = 0; i < 10; i++) {
+        for (int i = 0; i < 10; i++) {
             computeDistanceInit();
             deca_sleep(RNG_DELAY_MS);
         }
