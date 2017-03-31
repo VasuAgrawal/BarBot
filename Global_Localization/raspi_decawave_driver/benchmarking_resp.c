@@ -114,8 +114,10 @@ static void final_msg_get_ts(const uint8 *ts_field, uint32 *ts);
 /**
  * Performs a ranging computation of the distance, from the receiving side.
  * Sends acknowledgment that the exchange has completed before exiting this function.
+ *
+ * Returns 0 on success, -1 on failure.
  */
-void computeDistanceResp() {
+int computeDistanceResp() {
     /* Clear reception timeout to start next ranging process. */
     dwt_setrxtimeout(0);
 
@@ -126,6 +128,8 @@ void computeDistanceResp() {
     while (!((status_reg = dwt_read32bitreg(SYS_STATUS_ID)) & (SYS_STATUS_RXFCG | SYS_STATUS_ALL_RX_TO | SYS_STATUS_ALL_RX_ERR)));
 
     if (status_reg & SYS_STATUS_RXFCG) {
+        //printf("Received initial\n");
+
         uint32 frame_len;
 
         /* Clear good RX frame event in the DW1000 status register. */
@@ -159,7 +163,14 @@ void computeDistanceResp() {
             tx_resp_msg[ALL_MSG_SN_IDX] = frame_seq_nb;
             dwt_writetxdata(sizeof(tx_resp_msg), tx_resp_msg, 0); /* Zero offset in TX buffer. */
             dwt_writetxfctrl(sizeof(tx_resp_msg), 0, 1); /* Zero offset in TX buffer, ranging. */
-            ret = dwt_starttx(DWT_START_TX_IMMEDIATE | DWT_RESPONSE_EXPECTED);
+            dwt_starttx(DWT_START_TX_IMMEDIATE | DWT_RESPONSE_EXPECTED);
+
+            if (ret == DWT_ERROR) {
+                printf("Error in delayed send\n");
+                return -1;
+            }
+
+            //printf("Sent ack\n");
 
             /* Poll for reception of expected "final" frame or error/timeout. */
             while (!((status_reg = dwt_read32bitreg(SYS_STATUS_ID)) & (SYS_STATUS_RXFCG | SYS_STATUS_ALL_RX_TO | SYS_STATUS_ALL_RX_ERR)));
@@ -168,6 +179,7 @@ void computeDistanceResp() {
             frame_seq_nb++;
 
             if (status_reg & SYS_STATUS_RXFCG) {
+                printf("Received final\n");
                 /* Clear good RX frame event and TX frame sent in the DW1000 status register. */
                 dwt_write32bitreg(SYS_STATUS_ID, SYS_STATUS_RXFCG | SYS_STATUS_TXFRS);
 
@@ -208,6 +220,26 @@ void computeDistanceResp() {
                     tof = tof_dtu * DWT_TIME_UNITS;
                     distance = tof * SPEED_OF_LIGHT;
 
+                    printf("DWT_TIME_UNITS: %1.15f", DWT_TIME_UNITS);
+
+                    printf("Ra: %3.2f\n", Ra);
+                    printf("Rb: %3.2f\n", Rb);
+                    printf("Da: %3.2f\n", Da);
+                    printf("Db: %3.2f\n", Db);
+                    printf("ToF DTU: %llu\n", tof_dtu);
+                    printf("ToF: %3.2f\n", tof);
+                    printf("Distance: %3.2f\n", distance);
+                    
+                    /* Send final message as acknowledgment */
+                    /*
+                    dwt_writetxdata(sizeof(tx_resp_msg), tx_resp_msg, 0);
+                    dwt_writetxfctrl(sizeof(tx_resp_msg), 0, 1);
+                    ret = dwt_starttx(DWT_START_TX_IMMEDIATE);
+                    */
+                    //printf("Sent final\n");
+
+
+                    return 0;
                     /*
                     dist_buf[dist_buf_idx++] = distance;
                     if (dist_buf_idx == 10) {
@@ -224,6 +256,7 @@ void computeDistanceResp() {
                }
             }
             else {
+                printf("Timeout/error 2\n");
                 /* Clear RX error/timeout events in the DW1000 status register. */
                 dwt_write32bitreg(SYS_STATUS_ID, SYS_STATUS_ALL_RX_TO | SYS_STATUS_ALL_RX_ERR);
 
@@ -233,12 +266,15 @@ void computeDistanceResp() {
         }
     }
     else {
+        //printf("Timeout/error 1\n");
         /* Clear RX error/timeout events in the DW1000 status register. */
         dwt_write32bitreg(SYS_STATUS_ID, SYS_STATUS_ALL_RX_TO | SYS_STATUS_ALL_RX_ERR);
 
         /* Reset RX to properly reinitialise LDE operation. */
         dwt_rxreset();
     }
+
+    return -1;
 }
 
 /*! ------------------------------------------------------------------------------------------------------------------
@@ -317,16 +353,29 @@ int main(int argc, char *argv[])
     dwt_settxantennadelay(TX_ANT_DLY);
 
     /* Set preamble timeout for expected frames. See NOTE 6 below. */
-    //dwt_setpreambledetecttimeout(PRE_TIMEOUT);
+    dwt_setpreambledetecttimeout(PRE_TIMEOUT);
+
+    int successCount = 0;
+    int retval;
 
     /* Loop forever responding to ranging requests. */
     while (1)
     {
+        int retval = computeDistanceResp();
+        if (retval == 0) {
+            successCount++;
+            printf("%3.5f\n", distance);
+            if (successCount == 10) {
+                break;
+            }
+        }
+
+        /*
         for (int i = 0; i < 50; i++) {
             computeDistanceResp();
             printf("%3.5f\n", distance);
         }
-        /*
+        
         config.chan = 2;
         dwt_forcetrxoff();
         dwt_configure(&config);
@@ -377,7 +426,6 @@ int main(int argc, char *argv[])
             printf("%3.5f\n", distance);
         }
         */
-        break;
     }
 }
 
