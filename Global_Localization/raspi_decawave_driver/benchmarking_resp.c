@@ -291,7 +291,7 @@ int main(void)
         dwt_configure(&config);
 
         printf("Configuration 2\n");
-        for (i = 0; i < 10; i++) {
+        for (int i = 0; i < 10; i++) {
             computeDistanceResp();
             printf("%3.5f\n", distance);
         }
