@@ -29,7 +29,7 @@
 #define APP_NAME "DS TWR INIT v1.2"
 
 /* Inter-ranging delay period, in milliseconds. */
-#define RNG_DELAY_MS 100
+#define RNG_DELAY_MS 1000
 
 /* Default communication configuration. We use here EVK1000's default mode (mode 3). */
 static dwt_config_t config = {
@@ -99,17 +99,19 @@ static uint64 get_tx_timestamp_u64(void);
 static uint64 get_rx_timestamp_u64(void);
 static void final_msg_set_ts(uint8 *ts_field, uint64 ts);
 
-
 /**
  * Performs a ranging computation of the distance, from the initiating side.
  * Waits for acknowledgment that the exchange has completed before exiting this function.
+ *
+ * Returns 0 on success, -1 on failure.
  */
-void computeDistanceInit() {
+int computeDistanceInit() {
     /* Write initial ping frame data to Decawave and prepare transmission. */
     tx_poll_msg[ALL_MSG_SN_IDX] = frame_seq_nb;
     dwt_writetxdata(sizeof(tx_poll_msg), tx_poll_msg, 0); /* Zero offset in TX buffer. */
     dwt_writetxfctrl(sizeof(tx_poll_msg), 0, 1); /* Zero offset in TX buffer, ranging. */
 
+    //printf("Sent initial\n");
     /* Start transmission, indicate that response is expected so reception is enabled automatically. */
     dwt_starttx(DWT_START_TX_IMMEDIATE | DWT_RESPONSE_EXPECTED);
 
@@ -117,6 +119,7 @@ void computeDistanceInit() {
     while (!((status_reg = dwt_read32bitreg(SYS_STATUS_ID)) & (SYS_STATUS_RXFCG | SYS_STATUS_ALL_RX_TO | SYS_STATUS_ALL_RX_ERR)));
 
     if (status_reg & SYS_STATUS_RXFCG) {
+        //printf("Received ack\n");
         /* Received ack. */
         uint32 frame_len;
 
@@ -157,14 +160,45 @@ void computeDistanceInit() {
             dwt_writetxdata(sizeof(tx_final_msg), tx_final_msg, 0); /* Zero offset in TX buffer. */
             dwt_writetxfctrl(sizeof(tx_final_msg), 0, 1); /* Zero offset in TX buffer, ranging. */
             ret = dwt_starttx(DWT_START_TX_DELAYED);
+            
+            if (ret == DWT_SUCCESS) {
+                /* Poll DW1000 until TX frame sent event set. */
+                while (!(dwt_read32bitreg(SYS_STATUS_ID) & SYS_STATUS_TXFRS));
 
-            /* Poll DW1000 until TX frame sent event set. */
-            while (!(dwt_read32bitreg(SYS_STATUS_ID) & SYS_STATUS_TXFRS));
+                //printf("Sent final\n");
+    
+                /* Clear TXFRS event. */
+                dwt_write32bitreg(SYS_STATUS_ID, SYS_STATUS_TXFRS);
 
-            /* Clear TXFRS event. */
-            dwt_write32bitreg(SYS_STATUS_ID, SYS_STATUS_TXFRS);
+                return 0;
+
+                /* Wait for final confirmation message from other device */
+                /*
+                dwt_rxenable(DWT_START_RX_IMMEDIATE);
+
+                while (!((status_reg = dwt_read32bitreg(SYS_STATUS_ID)) & (SYS_STATUS_RXFCG | SYS_STATUS_ALL_RX_TO | SYS_STATUS_ALL_RX_ERR)));
+
+                if (status_reg & SYS_STATUS_RXFCG) {
+                    return 0;
+                    printf("Finished\n");
+                }
+                else {
+                    return -1;
+                    printf("Final ack timeout\n");
+                }
+                */
+            }
         }
     }
+    else {
+        /* Clear RX error/timeout events in the DW1000 status register. */
+        dwt_write32bitreg(SYS_STATUS_ID, SYS_STATUS_ALL_RX_TO | SYS_STATUS_ALL_RX_ERR);
+
+        /* Reset RX to properly reinitialise LDE operation. */
+        dwt_rxreset();
+    }
+    
+    return -1;
 }
 
 /*! ------------------------------------------------------------------------------------------------------------------
@@ -244,16 +278,30 @@ int main(int argc, char *argv[])
 
     /* Set expected response's delay and timeout. See NOTE 4, 5 and 6 below.
      * As this example only handles one incoming frame with always the same delay and timeout, those values can be set here once for all. */
+    dwt_setrxtimeout(RESP_RX_TIMEOUT_UUS);
+   
+    int successCount = 0;
+    int retval;
 
     /* Loop forever initiating ranging exchanges. */
     while (1)
     {
+        retval = computeDistanceInit();
+        if (retval == 0) {
+            successCount++;
+            printf("Finished\n");
+            if (successCount == 10) {
+                //break;
+            }
+        }
+        deca_sleep(RNG_DELAY_MS);
+
+        /*
         for (int i = 0; i < 50; i++) {
             computeDistanceInit();
             deca_sleep(RNG_DELAY_MS);
         }
 
-        /*
         config.chan = 2;
         dwt_forcetrxoff();
         dwt_configure(&config);
@@ -304,7 +352,6 @@ int main(int argc, char *argv[])
             deca_sleep(RNG_DELAY_MS);
         }
         */
-        break;
     }
 }
 
