@@ -220,7 +220,7 @@ void computeDistanceResp() {
                         dist_buf_idx = 0;
                     }
                     */
-                }
+               }
             }
             else {
                 /* Clear RX error/timeout events in the DW1000 status register. */
