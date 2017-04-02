@@ -171,7 +171,7 @@ int computeDistanceResp() {
             if (ret == DWT_ERROR)
             {
                 printf("Error transmitting response frame\n");
-                continue;
+                return 0;
             }
 
             /* Poll for reception of expected "final" frame or error/timeout. See NOTE 8 below. */
