@@ -29,11 +29,11 @@
 #define APP_NAME "DS TWR INIT v1.2"
 
 /* Inter-ranging delay period, in milliseconds. */
-#define RNG_DELAY_MS 1000
+#define RNG_DELAY_MS 100
 
 /* Default communication configuration. We use here EVK1000's default mode (mode 3). */
 static dwt_config_t config = {
-    1,               /* Channel number. */
+    2,               /* Channel number. */
     DWT_PRF_64M,     /* Pulse repetition frequency. */
     DWT_PLEN_1024,   /* Preamble length. Used in TX only. */
     DWT_PAC32,       /* Preamble acquisition chunk size. Used in RX only. */
@@ -203,6 +203,7 @@ int computeDistanceInit() {
 int main(int argc, char *argv[])
 {
     /* Read command line arguments. */
+    /*
     if (argc != 3) {
         printf("Usage: [channel: 1, 2, 3, 4, 5, 7] [dataRate: 1, 2, 3]\n");
         return -1;
@@ -242,6 +243,7 @@ int main(int argc, char *argv[])
             }
         }
     }
+    */
 
     /* Start with board specific hardware init. */
     raspiDecawaveInit();
@@ -268,16 +270,16 @@ int main(int argc, char *argv[])
 
     /* Set expected response's delay and timeout. See NOTE 4, 5 and 6 below.
      * As this example only handles one incoming frame with always the same delay and timeout, those values can be set here once for all. */
-    dwt_setrxtimeout(RESP_RX_TIMEOUT_UUS);
+    //dwt_setrxtimeout(RESP_RX_TIMEOUT_UUS);
    
-    int successCount = 0;
-    int retval;
+    //int successCount = 0;
+    //int retval;
 
     /* Loop forever initiating ranging exchanges. */
     while (1)
     {
     	computeDistanceInit();
-
+        deca_sleep(RNG_DELAY_MS);
     	/*
         retval = computeDistanceInit();
         if (retval == 0) {
