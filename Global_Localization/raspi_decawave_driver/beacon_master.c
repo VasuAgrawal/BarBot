@@ -116,11 +116,15 @@ static double distance;
 static double dist_buf[10] = {0.f};
 static int dist_buf_idx = 0;
 
+/* ID of the current device */
+static char device_id;
+
 /* Declaration of static functions. */
 static uint64 get_tx_timestamp_u64(void);
 static uint64 get_rx_timestamp_u64(void);
 static void final_msg_set_ts(uint8 *ts_field, uint64 ts);
 static void final_msg_get_ts(const uint8 *ts_field, uint32 *ts);
+static void set_msg_addresses(uint8 master_addr, uint8 slave_addr);
 
 /**
  * Performs a ranging computation of the distance, from the initiating side.
@@ -358,8 +362,8 @@ int main(int argc, char *argv[]) {
 	bool isMaster = false;
 
 	/* Read command line arguments */
-	if (argc != 2) {
-		printf("Usage: [master/slave]\n");
+	if (argc != 3) {
+		printf("Usage: [master/slave] [ID: A, B, C, etc.]\n");
 		return -1;
 	}
 	else {
@@ -367,6 +371,9 @@ int main(int argc, char *argv[]) {
 			/* This is the master node, update the mode accordingly */
 			isMaster = true;
 		}
+
+        /* Set device ID */
+        device_id = *(argv[2]);
 	}
 
     /* Start with board specific hardware init. */
@@ -389,6 +396,9 @@ int main(int argc, char *argv[]) {
     /* Apply default antenna delay value. See NOTE 1 below. */
     dwt_setrxantennadelay(RX_ANT_DLY);
     dwt_settxantennadelay(TX_ANT_DLY);
+
+    /* Set up messages with appropriate IDs */
+    set_msg_addresses('A', 'B');
 
     /* Loop forever initiating ranging exchanges. */
     while (1) {
