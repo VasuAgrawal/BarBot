@@ -122,7 +122,7 @@ static double distance;
 static double dist_buf[10] = {0.f};
 static int dist_buf_idx = 0;
 
-#define NUM_DEVICES 2
+#define NUM_DEVICES 3
 #define NUM_MEASUREMENTS 100
 /* ID of the current device */
 static uint8 device_addr;
@@ -408,6 +408,8 @@ int main(int argc, char *argv[]) {
     				computeDistanceInit();
     				deca_sleep(RNG_DELAY_MS);
     			}
+
+                deca_sleep(1000);
     		}
 
     		deca_sleep(5000);
