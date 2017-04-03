@@ -385,7 +385,7 @@ int main(int argc, char *argv[]) {
     dwt_settxantennadelay(TX_ANT_DLY);
 
     /* Set up messages with appropriate IDs */
-    //set_msg_addresses('A', 'B');
+    set_msg_addresses(0, device_addr);
 
     int retval;
 
@@ -400,6 +400,8 @@ int main(int argc, char *argv[]) {
     				continue;
     			}
     			set_msg_addresses(device_addr, target_addr);
+
+                printf("Master: %d. Target: %d\n", device_addr, target_addr);
 
     			// Send messages to the selected slave
     			for (int j = 0; j < NUM_MEASUREMENTS; j++) {
