@@ -30,7 +30,7 @@
 
 /* Default communication configuration. We use here EVK1000's default mode (mode 3). */
 static dwt_config_t config = {
-    1,               /* Channel number. */
+    2,               /* Channel number. */
     DWT_PRF_64M,     /* Pulse repetition frequency. */
     DWT_PLEN_1024,   /* Preamble length. Used in TX only. */
     DWT_PAC32,       /* Preamble acquisition chunk size. Used in RX only. */
@@ -117,7 +117,7 @@ static void final_msg_get_ts(const uint8 *ts_field, uint32 *ts);
  *
  * Returns 0 on success, -1 on failure.
  */
-int computeDistanceResp() {
+void computeDistanceResp() {
     /* Clear reception timeout to start next ranging process. */
     dwt_setrxtimeout(0);
 
@@ -171,7 +171,7 @@ int computeDistanceResp() {
             if (ret == DWT_ERROR)
             {
                 printf("Error transmitting response frame\n");
-                return 0;
+                return ;
             }
 
             /* Poll for reception of expected "final" frame or error/timeout. See NOTE 8 below. */
@@ -270,6 +270,7 @@ int computeDistanceResp() {
 int main(int argc, char *argv[])
 {
     /* Read command line arguments. */
+    /*
     if (argc != 3) {
         printf("Usage: [channel: 1, 2, 3, 4, 5, 7] [dataRate: 1, 2, 3]\n");
         return -1;
@@ -309,6 +310,7 @@ int main(int argc, char *argv[])
             }
         }
     }
+    */
 
     /* Start with board specific hardware init. */
     raspiDecawaveInit();
@@ -334,10 +336,10 @@ int main(int argc, char *argv[])
     dwt_settxantennadelay(TX_ANT_DLY);
 
     /* Set preamble timeout for expected frames. See NOTE 6 below. */
-    dwt_setpreambledetecttimeout(PRE_TIMEOUT);
+    //dwt_setpreambledetecttimeout(PRE_TIMEOUT);
 
-    int successCount = 0;
-    int retval;
+    //int successCount = 0;
+    //int retval;
 
     /* Loop forever responding to ranging requests. */
     while (1)
