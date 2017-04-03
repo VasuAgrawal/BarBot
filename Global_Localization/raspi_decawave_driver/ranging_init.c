@@ -29,7 +29,7 @@
 #define APP_NAME "DS TWR INIT v1.2"
 
 /* Inter-ranging delay period, in milliseconds. */
-#define RNG_DELAY_MS 100
+#define RNG_DELAY_MS 5
 
 /* Default communication configuration. We use here EVK1000's default mode (mode 3). */
 static dwt_config_t config = {
@@ -83,7 +83,7 @@ static uint32 status_reg = 0;
  * frame length of approximately 2.66 ms with above configuration. */
 #define RESP_RX_TO_FINAL_TX_DLY_UUS 3100
 /* Receive response timeout. See NOTE 5 below. */
-#define RESP_RX_TIMEOUT_UUS 2700
+#define RESP_RX_TIMEOUT_UUS 5400
 /* Preamble timeout, in multiple of PAC size. See NOTE 6 below. */
 #define PRE_TIMEOUT 8
 
@@ -116,14 +116,12 @@ int computeDistanceInit() {
     dwt_starttx(DWT_START_TX_IMMEDIATE | DWT_RESPONSE_EXPECTED);
 
     /* We assume that the transmission is achieved correctly, poll for reception of a frame or error/timeout. See NOTE 9 below. */
-    while (!((status_reg = dwt_read32bitreg(SYS_STATUS_ID)) & (SYS_STATUS_RXFCG | SYS_STATUS_ALL_RX_TO | SYS_STATUS_ALL_RX_ERR)))
-    { };
+    while (!((status_reg = dwt_read32bitreg(SYS_STATUS_ID)) & (SYS_STATUS_RXFCG | SYS_STATUS_ALL_RX_TO | SYS_STATUS_ALL_RX_ERR)));
 
     /* Increment frame sequence number after transmission of the poll message (modulo 256). */
     frame_seq_nb++;
 
-    if (status_reg & SYS_STATUS_RXFCG)
-    {
+    if (status_reg & SYS_STATUS_RXFCG) {
         uint32 frame_len;
 
         /* Clear good RX frame event and TX frame sent in the DW1000 status register. */
@@ -131,16 +129,14 @@ int computeDistanceInit() {
 
         /* A frame has been received, read it into the local buffer. */
         frame_len = dwt_read32bitreg(RX_FINFO_ID) & RX_FINFO_RXFLEN_MASK;
-        if (frame_len <= RX_BUF_LEN)
-        {
+        if (frame_len <= RX_BUF_LEN) {
             dwt_readrxdata(rx_buffer, frame_len, 0);
         }
 
         /* Check that the frame is the expected response from the companion "DS TWR responder" example.
          * As the sequence number field of the frame is not relevant, it is cleared to simplify the validation of the frame. */
         rx_buffer[ALL_MSG_SN_IDX] = 0;
-        if (memcmp(rx_buffer, rx_resp_msg, ALL_MSG_COMMON_LEN) == 0)
-        {
+        if (memcmp(rx_buffer, rx_resp_msg, ALL_MSG_COMMON_LEN) == 0) {
             uint32 final_tx_time;
             int ret;
 
@@ -167,11 +163,9 @@ int computeDistanceInit() {
             ret = dwt_starttx(DWT_START_TX_DELAYED);
 
             /* If dwt_starttx() returns an error, abandon this ranging exchange and proceed to the next one. See NOTE 12 below. */
-            if (ret == DWT_SUCCESS)
-            {
+            if (ret == DWT_SUCCESS) {
                 /* Poll DW1000 until TX frame sent event set. See NOTE 9 below. */
-                while (!(dwt_read32bitreg(SYS_STATUS_ID) & SYS_STATUS_TXFRS))
-                { };
+                while (!(dwt_read32bitreg(SYS_STATUS_ID) & SYS_STATUS_TXFRS));
 
                 /* Clear TXFRS event. */
                 dwt_write32bitreg(SYS_STATUS_ID, SYS_STATUS_TXFRS);
@@ -181,14 +175,15 @@ int computeDistanceInit() {
             }
         }
     }
-    else
-    {
+    else {
         /* Clear RX error/timeout events in the DW1000 status register. */
         dwt_write32bitreg(SYS_STATUS_ID, SYS_STATUS_ALL_RX_TO | SYS_STATUS_ALL_RX_ERR);
 
         /* Reset RX to properly reinitialise LDE operation. */
         dwt_rxreset();
     }
+
+    return -1;
 }
 
 /*! ------------------------------------------------------------------------------------------------------------------
@@ -249,11 +244,9 @@ int main(int argc, char *argv[])
     raspiDecawaveInit();
 
     /* Initialize */
-    if (dwt_initialise(DWT_LOADUCODE) == DWT_ERROR)
-    {
+    if (dwt_initialise(DWT_LOADUCODE) == DWT_ERROR) {
         printf("DWM1000: Initialization Failed!\n");
-        while (1)
-        { };
+        while (1);
     }
     printf("DWM1000: Initialization Complete\n");
     
@@ -272,25 +265,24 @@ int main(int argc, char *argv[])
      * As this example only handles one incoming frame with always the same delay and timeout, those values can be set here once for all. */
     //dwt_setrxtimeout(RESP_RX_TIMEOUT_UUS);
    
-    //int successCount = 0;
-    //int retval;
+    int successCount = 0;
+    int retval;
 
     /* Loop forever initiating ranging exchanges. */
-    while (1)
-    {
+    while (1) {
     	computeDistanceInit();
         deca_sleep(RNG_DELAY_MS);
-    	/*
+    	continue;
+
         retval = computeDistanceInit();
         if (retval == 0) {
             successCount++;
             printf("Finished\n");
             if (successCount == 10) {
-                //break;
+                break;
             }
         }
         deca_sleep(RNG_DELAY_MS);
-		*/
 
         /*
         for (int i = 0; i < 50; i++) {
