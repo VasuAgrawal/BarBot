@@ -96,6 +96,7 @@ static uint32 status_reg = 0;
 
 /* Time-stamps of frames transmission/reception, expressed in device time units.
  * As they are 40-bit wide, we need to define a 64-bit int type to handle them. */
+typedef signed long long int64;
 typedef unsigned long long uint64;
 static uint64 poll_tx_ts;
 static uint64 poll_rx_ts;
