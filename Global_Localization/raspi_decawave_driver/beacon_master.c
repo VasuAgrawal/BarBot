@@ -133,6 +133,7 @@ static uint64 get_rx_timestamp_u64(void);
 static void final_msg_set_ts(uint8 *ts_field, uint64 ts);
 static void final_msg_get_ts(const uint8 *ts_field, uint32 *ts);
 static void set_msg_addresses(uint8 master_addr, uint8 slave_addr);
+static int validate_frame(uint8* frame, uint8 expected_type);
 
 /**
  * Performs a ranging computation of the distance, from the initiating side.
@@ -411,7 +412,7 @@ int main(int argc, char *argv[]) {
     		continue;
 
     		// Finished sending 100 messages. Select next master
-    		uint8 next_master = (device_addr + i) % NUM_DEVICES;
+    		uint8 next_master = (device_addr + 1) % NUM_DEVICES;
 
     		// Transmit Switch message to next master
     		//@TODO: Do this.
