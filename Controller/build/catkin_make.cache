@@ -1,0 +1,2 @@
+barbot
+-DCATKIN_DEVEL_PREFIX=/home/tommy/Workspace/BarBot/Controller/devel -DCMAKE_INSTALL_PREFIX=/home/tommy/Workspace/BarBot/Controller/install -G Unix Makefiles
