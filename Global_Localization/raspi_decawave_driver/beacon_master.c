@@ -49,13 +49,19 @@ static dwt_config_t config = {
 #define TX_ANT_DLY 16436
 #define RX_ANT_DLY 16436
 
+#define MSG_TYPE_POLL 0x21
+#define MSG_TYPE_RESP 0x10
+#define MSG_TYPE_FINAL 0x23
+#define MSG_TYPE_SWITCH 0x32
+#define MSG_TYPE_SWITCH_ACK 0x42
+
 /* Frames used in the ranging process. See NOTE 2 below. */
-static uint8 tx_poll_msg[] = {0x41, 0x88, 0, 0xCA, 0xDE, 'W', 'A', 'V', 'E', 0x21, 0, 0};
-static uint8 rx_poll_msg[] = {0x41, 0x88, 0, 0xCA, 0xDE, 'W', 'A', 'V', 'E', 0x21, 0, 0};
-static uint8 tx_resp_msg[] = {0x41, 0x88, 0, 0xCA, 0xDE, 'V', 'E', 'W', 'A', 0x10, 0x02, 0, 0, 0, 0};
-static uint8 rx_resp_msg[] = {0x41, 0x88, 0, 0xCA, 0xDE, 'V', 'E', 'W', 'A', 0x10, 0x02, 0, 0, 0, 0};
-static uint8 tx_final_msg[] = {0x41, 0x88, 0, 0xCA, 0xDE, 'W', 'A', 'V', 'E', 0x23, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
-static uint8 rx_final_msg[] = {0x41, 0x88, 0, 0xCA, 0xDE, 'W', 'A', 'V', 'E', 0x23, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+static uint8 tx_poll_msg[] = {0x41, 0x88, 0, 0xCA, 0xDE, 'W', 'A', 'V', 'E', MSG_TYPE_POLL, 0, 0};
+static uint8 rx_poll_msg[] = {0x41, 0x88, 0, 0xCA, 0xDE, 'W', 'A', 'V', 'E', MSG_TYPE_POLL, 0, 0};
+static uint8 tx_resp_msg[] = {0x41, 0x88, 0, 0xCA, 0xDE, 'V', 'E', 'W', 'A', MSG_TYPE_RESP, 0x02, 0, 0, 0, 0};
+static uint8 rx_resp_msg[] = {0x41, 0x88, 0, 0xCA, 0xDE, 'V', 'E', 'W', 'A', MSG_TYPE_RESP, 0x02, 0, 0, 0, 0};
+static uint8 tx_final_msg[] = {0x41, 0x88, 0, 0xCA, 0xDE, 'W', 'A', 'V', 'E', MSG_TYPE_FINAL, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+static uint8 rx_final_msg[] = {0x41, 0x88, 0, 0xCA, 0xDE, 'W', 'A', 'V', 'E', MSG_TYPE_FINAL, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
 /* Length of the common part of the message (up to and including the function code, see NOTE 2 below). */
 #define ALL_MSG_COMMON_LEN 10
 /* Indexes to access some of the fields in the frames defined above. */
@@ -116,8 +122,10 @@ static double distance;
 static double dist_buf[10] = {0.f};
 static int dist_buf_idx = 0;
 
+#define NUM_DEVICES 2
+#define NUM_MEASUREMENTS 100
 /* ID of the current device */
-static char device_id;
+static uint8 device_addr;
 
 /* Declaration of static functions. */
 static uint64 get_tx_timestamp_u64(void);
@@ -244,7 +252,8 @@ void computeDistanceResp() {
         /* Check that the frame is a poll sent by "DS TWR initiator" example.
          * As the sequence number field of the frame is not relevant, it is cleared to simplify the validation of the frame. */
         rx_buffer[ALL_MSG_SN_IDX] = 0;
-        if (memcmp(rx_buffer, rx_poll_msg, ALL_MSG_COMMON_LEN) == 0) {
+        //if (memcmp(rx_buffer, rx_poll_msg, ALL_MSG_COMMON_LEN) == 0) {
+        if (validate_frame(rx_buffer, MSG_TYPE_POLL) == 0) {
             //uint32 resp_tx_time;
             int ret;
 
@@ -272,7 +281,8 @@ void computeDistanceResp() {
             }
         }
         /* Check that the frame is a final message sent by "DS TWR initiator" example. */
-        else if (memcmp(rx_buffer, rx_final_msg, ALL_MSG_COMMON_LEN) == 0) {
+       	//else if (memcmp(rx_buffer, rx_final_msg, ALL_MSG_COMMON_LEN) == 0) {
+        else if (validate_frame(rx_buffer, MSG_TYPE_FINAL) == 0) {
             uint32 poll_tx_ts, resp_rx_ts, final_tx_ts;
             uint32 poll_rx_ts_32, resp_tx_ts_32, final_rx_ts_32;
             double Ra, Rb, Da, Db;
@@ -299,6 +309,9 @@ void computeDistanceResp() {
 
             tof = tof_dtu * DWT_TIME_UNITS;
             distance = tof * SPEED_OF_LIGHT;
+
+            printf("%3.2f\n", distance);
+            return;
 
             dist_buf[dist_buf_idx++] = distance;
             if (dist_buf_idx == 10) {
@@ -345,8 +358,8 @@ int main(int argc, char *argv[]) {
 			isMaster = true;
 		}
 
-        /* Set device ID */
-        device_id = *(argv[2]);
+        /* Set device address */
+        device_addr = atoi(argv[2]);
 	}
 
     /* Start with board specific hardware init. */
@@ -371,12 +384,37 @@ int main(int argc, char *argv[]) {
     dwt_settxantennadelay(TX_ANT_DLY);
 
     /* Set up messages with appropriate IDs */
-    set_msg_addresses('A', 'B');
+    //set_msg_addresses('A', 'B');
+
+    int retval;
 
     /* Loop forever initiating ranging exchanges. */
     while (1) {
     	if (isMaster == true) {
     		/* Perform master operations - i.e. be the initiator */
+    		for (int i = 0; i < NUM_DEVICES; i++) {
+    			// Select a slave
+    			uint8 target_addr = (device_addr + i) % NUM_DEVICES;
+    			if (target_addr == device_addr) {
+    				continue;
+    			}
+    			set_msg_addresses(device_addr, target_addr);
+
+    			// Send messages to the selected slave
+    			for (int j = 0; j < NUM_MEASUREMENTS; j++) {
+    				computeDistanceInit();
+    				deca_sleep(RNG_DELAY_MS);
+    			}
+    		}
+
+    		deca_sleep(5000);
+    		continue;
+
+    		// Finished sending 100 messages. Select next master
+    		uint8 next_master = (device_addr + i) % NUM_DEVICES;
+
+    		// Transmit Switch message to next master
+    		//@TODO: Do this.
     		computeDistanceInit();
     		deca_sleep(RNG_DELAY_MS);
     	}
@@ -502,6 +540,29 @@ static void set_msg_addresses(uint8 master_addr, uint8 slave_addr) {
 	rx_final_msg[MSG_SRC_ADDR+1] = master_addr;
 	rx_final_msg[MSG_DEST_ADDR] = slave_addr;
 	rx_final_msg[MSG_DEST_ADDR+1] = slave_addr;
+}
+
+/**
+ * Validates the frame against the fixed parameters, as well as the expected type of frame
+ */
+static int validate_frame(uint8* frame, uint8 expected_type) {
+	/* Validate frame control bytes */
+	if ((frame[0] != 0x41) || (frame[1] != 0x88)) {
+		return -1;
+	}
+	/* Validate PAN ID */
+	if ((frame[3] != 0xCA) || (frame[4] != 0xDE)) {
+		return -1;
+	}
+	/* Validate that message is intended for this device */
+	if ((frame[5] != device_addr) || (frame[6] != device_addr)) {
+		return -1;
+	}
+	/* Validate that the message is of the expected type */
+	if (frame[9] != expected_type) {
+		return -1;
+	}
+	return 0;
 }
 
 /*****************************************************************************************************************************************************
