@@ -263,12 +263,7 @@ void computeDistanceResp() {
          * As the sequence number field of the frame is not relevant, it is cleared to simplify the validation of the frame. */
         rx_buffer[ALL_MSG_SN_IDX] = 0;
         //if (memcmp(rx_buffer, rx_poll_msg, ALL_MSG_COMMON_LEN) == 0) {
-        for (int i = 0; i < frame_len; i++) {
-            printf("|%x", rx_buffer[i]);
-        }
-        printf("\n");
         if (validate_frame(rx_buffer, MSG_TYPE_POLL) == 0) {
-            printf("poll\n");
             //uint32 resp_tx_time;
             int ret;
 
@@ -300,7 +295,6 @@ void computeDistanceResp() {
         /* Check that the frame is a final message sent by "DS TWR initiator" example. */
        	//else if (memcmp(rx_buffer, rx_final_msg, ALL_MSG_COMMON_LEN) == 0) {
         else if (validate_frame(rx_buffer, MSG_TYPE_FINAL) == 0) {
-            printf("final\n");
             uint32 poll_tx_ts, resp_rx_ts, final_tx_ts;
             uint32 poll_rx_ts_32, resp_tx_ts_32, final_rx_ts_32;
             double Ra, Rb, Da, Db;
