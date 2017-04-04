@@ -122,11 +122,11 @@ static double distance;
 static double dist_buf[10] = {0.f};
 static int dist_buf_idx = 0;
 
-#define NUM_DEVICES 2
-#define NUM_MEASUREMENTS 100
 /* ID of the current device */
 static uint8 device_addr;
 
+static int num_devices;
+static int num_measurements;
 static bool is_master;
 static bool was_previous_master;
 
@@ -360,7 +360,7 @@ void computeDistanceResp() {
 void switchMaster() {
     printf("Switching\n");
     // Select next master - cycling backwards
-    uint8 next_master = (device_addr - 1 + NUM_DEVICES) % NUM_DEVICES;
+    uint8 next_master = (device_addr - 1 + num_devices) % num_devices;
     set_msg_addresses(device_addr, next_master);
 
     was_previous_master = true;
@@ -392,8 +392,8 @@ void switchMaster() {
  */
 int main(int argc, char *argv[]) {
 	/* Read command line arguments */
-	if (argc != 3) {
-		printf("Usage: [master/slave] [ID: A, B, C, etc.]\n");
+	if (argc != 5) {
+		printf("Usage: [master/slave] [ID: A, B, C, etc.] [Number of Devices] [Number of Measurements]\n");
 		return -1;
 	}
 	else {
@@ -407,6 +407,12 @@ int main(int argc, char *argv[]) {
 
         /* Set device address */
         device_addr = atoi(argv[2]);
+
+        /* Set number of devices */
+        num_devices = atoi(argv[3]);
+
+        /* Set number of measurements */
+        num_measurements = atoi(argv[4]);
 	}
 
     /* Start with board specific hardware init. */
@@ -439,9 +445,9 @@ int main(int argc, char *argv[]) {
     while (1) {
     	if (is_master == true) {
     		/* Perform master operations - i.e. be the initiator */
-    		for (int i = 0; i < NUM_DEVICES; i++) {
+    		for (int i = 0; i < num_devices; i++) {
     			// Select a slave
-    			uint8 target_addr = (device_addr + i) % NUM_DEVICES;
+    			uint8 target_addr = (device_addr + i) % num_devices;
     			if (target_addr == device_addr) {
     				continue;
     			}
@@ -450,7 +456,7 @@ int main(int argc, char *argv[]) {
                 printf("Master: %d. Target: %d\n", device_addr, target_addr);
 
     			// Send messages to the selected slave
-    			for (int j = 0; j < NUM_MEASUREMENTS; j++) {
+    			for (int j = 0; j < num_measurements; j++) {
     				computeDistanceInit();
     				deca_sleep(RNG_DELAY_MS);
     			}
