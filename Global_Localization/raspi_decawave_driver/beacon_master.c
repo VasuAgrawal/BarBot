@@ -122,7 +122,7 @@ static double distance;
 static double dist_buf[10] = {0.f};
 static int dist_buf_idx = 0;
 
-#define NUM_DEVICES 3
+#define NUM_DEVICES 2
 #define NUM_MEASUREMENTS 100
 /* ID of the current device */
 static uint8 device_addr;
@@ -178,7 +178,8 @@ int computeDistanceInit() {
         /* Check that the frame is the expected response from the companion "DS TWR responder" example.
          * As the sequence number field of the frame is not relevant, it is cleared to simplify the validation of the frame. */
         rx_buffer[ALL_MSG_SN_IDX] = 0;
-        if (memcmp(rx_buffer, rx_resp_msg, ALL_MSG_COMMON_LEN) == 0) {
+        //if (memcmp(rx_buffer, rx_resp_msg, ALL_MSG_COMMON_LEN) == 0) {
+        if (validate_frame(rx_buffer, MSG_TYPE_RESP) == 0) {
             uint32 final_tx_time;
             int ret;
 
@@ -236,7 +237,7 @@ int computeDistanceInit() {
  */
 void computeDistanceResp() {
     /* Clear reception timeout to start next ranging process. */
-    //dwt_setrxtimeout(0);
+    dwt_setrxtimeout(0);
 
     /* Activate reception immediately. */
     dwt_rxenable(DWT_START_RX_IMMEDIATE);
@@ -262,7 +263,12 @@ void computeDistanceResp() {
          * As the sequence number field of the frame is not relevant, it is cleared to simplify the validation of the frame. */
         rx_buffer[ALL_MSG_SN_IDX] = 0;
         //if (memcmp(rx_buffer, rx_poll_msg, ALL_MSG_COMMON_LEN) == 0) {
+        for (int i = 0; i < frame_len; i++) {
+            printf("|%x", rx_buffer[i]);
+        }
+        printf("\n");
         if (validate_frame(rx_buffer, MSG_TYPE_POLL) == 0) {
+            printf("poll\n");
             //uint32 resp_tx_time;
             int ret;
 
@@ -279,6 +285,8 @@ void computeDistanceResp() {
 
             /* Write and send the response message. See NOTE 10 below.*/
             tx_resp_msg[ALL_MSG_SN_IDX] = frame_seq_nb;
+            tx_resp_msg[MSG_DEST_ADDR] = rx_buffer[MSG_SRC_ADDR];
+            tx_resp_msg[MSG_DEST_ADDR+1] = rx_buffer[MSG_SRC_ADDR];
             dwt_writetxdata(sizeof(tx_resp_msg), tx_resp_msg, 0); /* Zero offset in TX buffer. */
             dwt_writetxfctrl(sizeof(tx_resp_msg), 0, 1); /* Zero offset in TX buffer, ranging. */
             ret = dwt_starttx(DWT_START_TX_IMMEDIATE | DWT_RESPONSE_EXPECTED);
@@ -292,6 +300,7 @@ void computeDistanceResp() {
         /* Check that the frame is a final message sent by "DS TWR initiator" example. */
        	//else if (memcmp(rx_buffer, rx_final_msg, ALL_MSG_COMMON_LEN) == 0) {
         else if (validate_frame(rx_buffer, MSG_TYPE_FINAL) == 0) {
+            printf("final\n");
             uint32 poll_tx_ts, resp_rx_ts, final_tx_ts;
             uint32 poll_rx_ts_32, resp_tx_ts_32, final_rx_ts_32;
             double Ra, Rb, Da, Db;
@@ -337,6 +346,7 @@ void computeDistanceResp() {
         else if (validate_frame(rx_buffer, MSG_TYPE_SWITCH)) {
             // Switch to master mode
             is_master = true;
+            deca_sleep(1000);
         }
     }
     else {
@@ -366,8 +376,12 @@ void switchMaster() {
     dwt_writetxfctrl(sizeof(switch_msg), 0, 1); /* Zero offset in TX buffer, ranging. */
     int ret = dwt_starttx(DWT_START_TX_IMMEDIATE);
 
-    if (ret == DWT_ERROR) {
-        printf("ERROR\n");
+    if (ret == DWT_SUCCESS) {
+        /* Poll DW1000 until TX frame sent event set. See NOTE 9 below. */
+        while (!(dwt_read32bitreg(SYS_STATUS_ID) & SYS_STATUS_TXFRS));
+
+        /* Clear TXFRS event. */
+        dwt_write32bitreg(SYS_STATUS_ID, SYS_STATUS_TXFRS);
     }
 
     is_master = false;
