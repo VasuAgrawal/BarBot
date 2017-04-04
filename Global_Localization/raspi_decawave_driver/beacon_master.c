@@ -591,6 +591,12 @@ static void set_msg_addresses(uint8 master_addr, uint8 slave_addr) {
 	rx_final_msg[MSG_SRC_ADDR+1] = master_addr;
 	rx_final_msg[MSG_DEST_ADDR] = slave_addr;
 	rx_final_msg[MSG_DEST_ADDR+1] = slave_addr;
+
+    /* Switch message addresses */
+    switch_msg[MSG_SRC_ADDR] = master_addr;
+    switch_msg[MSG_SRC_ADDR+1] = master_addr;
+    switch_msg[MSG_DEST_ADDR] = slave_addr;
+    switch_msg[MSG_DEST_ADDR+1] = slave_addr;
 }
 
 /**
