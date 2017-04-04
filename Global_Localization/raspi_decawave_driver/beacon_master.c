@@ -53,7 +53,6 @@ static dwt_config_t config = {
 #define MSG_TYPE_RESP 0x10
 #define MSG_TYPE_FINAL 0x23
 #define MSG_TYPE_SWITCH 0x32
-#define MSG_TYPE_SWITCH_ACK 0x42
 
 /* Frames used in the ranging process. See NOTE 2 below. */
 static uint8 tx_poll_msg[] = {0x41, 0x88, 0, 0xCA, 0xDE, 'W', 'A', 'V', 'E', MSG_TYPE_POLL, 0, 0};
@@ -62,6 +61,7 @@ static uint8 tx_resp_msg[] = {0x41, 0x88, 0, 0xCA, 0xDE, 'V', 'E', 'W', 'A', MSG
 static uint8 rx_resp_msg[] = {0x41, 0x88, 0, 0xCA, 0xDE, 'V', 'E', 'W', 'A', MSG_TYPE_RESP, 0x02, 0, 0, 0, 0};
 static uint8 tx_final_msg[] = {0x41, 0x88, 0, 0xCA, 0xDE, 'W', 'A', 'V', 'E', MSG_TYPE_FINAL, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
 static uint8 rx_final_msg[] = {0x41, 0x88, 0, 0xCA, 0xDE, 'W', 'A', 'V', 'E', MSG_TYPE_FINAL, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+static uint8 switch_msg[] = {0x41, 0x88, 0, 0xCA, 0xDE, 'W', 'A', 'V', 'E', MSG_TYPE_SWITCH, 0, 0};
 /* Length of the common part of the message (up to and including the function code, see NOTE 2 below). */
 #define ALL_MSG_COMMON_LEN 10
 /* Indexes to access some of the fields in the frames defined above. */
@@ -127,6 +127,9 @@ static int dist_buf_idx = 0;
 /* ID of the current device */
 static uint8 device_addr;
 
+static bool is_master;
+static bool was_previous_master;
+
 /* Declaration of static functions. */
 static uint64 get_tx_timestamp_u64(void);
 static uint64 get_rx_timestamp_u64(void);
@@ -134,6 +137,7 @@ static void final_msg_set_ts(uint8 *ts_field, uint64 ts);
 static void final_msg_get_ts(const uint8 *ts_field, uint32 *ts);
 static void set_msg_addresses(uint8 master_addr, uint8 slave_addr);
 static int validate_frame(uint8* frame, uint8 expected_type);
+void switchMaster();
 
 /**
  * Performs a ranging computation of the distance, from the initiating side.
@@ -142,6 +146,8 @@ static int validate_frame(uint8* frame, uint8 expected_type);
  * Returns 0 on success, -1 on failure.
  */
 int computeDistanceInit() {
+    dwt_setrxtimeout(RESP_RX_TIMEOUT_UUS);
+    
     /* Write frame data to DW1000 and prepare transmission. See NOTE 8 below. */
     tx_poll_msg[ALL_MSG_SN_IDX] = frame_seq_nb;
     dwt_writetxdata(sizeof(tx_poll_msg), tx_poll_msg, 0); /* Zero offset in TX buffer. */
@@ -239,6 +245,8 @@ void computeDistanceResp() {
     while (!((status_reg = dwt_read32bitreg(SYS_STATUS_ID)) & (SYS_STATUS_RXFCG | SYS_STATUS_ALL_RX_TO | SYS_STATUS_ALL_RX_ERR)));
 
     if (status_reg & SYS_STATUS_RXFCG) {
+        was_previous_master = false; // Can assume that if we received a frame, master has been successfully passed on
+
         uint32 frame_len;
 
         /* Clear good RX frame event in the DW1000 status register. */
@@ -326,6 +334,10 @@ void computeDistanceResp() {
                 dist_buf_idx = 0;
             }
         }
+        else if (validate_frame(rx_buffer, MSG_TYPE_SWITCH)) {
+            // Switch to master mode
+            is_master = true;
+        }
     }
     else {
         /* Clear RX error/timeout events in the DW1000 status register. */
@@ -333,7 +345,32 @@ void computeDistanceResp() {
 
         /* Reset RX to properly reinitialise LDE operation. */
         dwt_rxreset();
+
+        if (was_previous_master == true) {
+            // Try the switch again
+            switchMaster();
+        }
     }
+}
+
+void switchMaster() {
+    printf("Switching\n");
+    // Select next master - cycling backwards
+    uint8 next_master = (device_addr - 1 + NUM_DEVICES) % NUM_DEVICES;
+    set_msg_addresses(device_addr, next_master);
+
+    was_previous_master = true;
+
+    // Send message to indicate that next master must become master
+    dwt_writetxdata(sizeof(switch_msg), switch_msg, 0); /* Zero offset in TX buffer. */
+    dwt_writetxfctrl(sizeof(switch_msg), 0, 1); /* Zero offset in TX buffer, ranging. */
+    int ret = dwt_starttx(DWT_START_TX_IMMEDIATE);
+
+    if (ret == DWT_ERROR) {
+        printf("ERROR\n");
+    }
+
+    is_master = false;
 }
 
 /*! ------------------------------------------------------------------------------------------------------------------
@@ -346,8 +383,6 @@ void computeDistanceResp() {
  * @return none
  */
 int main(int argc, char *argv[]) {
-	bool isMaster = false;
-
 	/* Read command line arguments */
 	if (argc != 3) {
 		printf("Usage: [master/slave] [ID: A, B, C, etc.]\n");
@@ -356,8 +391,11 @@ int main(int argc, char *argv[]) {
 	else {
 		if (strcmp(argv[1], "master") == 0) {
 			/* This is the master node, update the mode accordingly */
-			isMaster = true;
+			is_master = true;
 		}
+        else {
+            is_master = false;
+        }
 
         /* Set device address */
         device_addr = atoi(argv[2]);
@@ -391,7 +429,7 @@ int main(int argc, char *argv[]) {
 
     /* Loop forever initiating ranging exchanges. */
     while (1) {
-    	if (isMaster == true) {
+    	if (is_master == true) {
     		/* Perform master operations - i.e. be the initiator */
     		for (int i = 0; i < NUM_DEVICES; i++) {
     			// Select a slave
@@ -413,15 +451,9 @@ int main(int argc, char *argv[]) {
     		}
 
     		deca_sleep(5000);
-    		continue;
-
-    		// Finished sending 100 messages. Select next master
-    		uint8 next_master = (device_addr + 1) % NUM_DEVICES;
 
     		// Transmit Switch message to next master
-    		//@TODO: Do this.
-    		computeDistanceInit();
-    		deca_sleep(RNG_DELAY_MS);
+    		switchMaster();
     	}
     	else {
     		/* Perform slave operations - i.e. be the responder */
