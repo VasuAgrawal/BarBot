@@ -4,3 +4,5 @@ createuser barbotdev
 psql
 alter user barbotdev with encrypted password 'icanswim';
 grant all privilleges on database barbotdb to barbotdev;
+
+pg_ctl -o "-p 10601" -D woo start
