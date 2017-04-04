@@ -171,9 +171,10 @@ class BartenderHandler(PostgresHandler):
                 drinks.append(drink)
 
             order_sql = """
-                    SELECT id, user_id, drink_id, completed, time
+                    SELECT id, user_id, drink_id, completed, time, robot_id, priority
                     FROM orders
                     WHERE completed = FALSE
+                    ORDER BY priority
                 """
             order_cursor = yield self.db().execute(order_sql)
             drink_desc = order_cursor.description
@@ -185,21 +186,28 @@ class BartenderHandler(PostgresHandler):
                 for drink in drinks:
                     if(drink.id == drinkId):
                         drinkName = drink.type
-                order = Order(item['id'], item['user_id'], drinkId, drinkName, item['time'])
+                order = Order(item['id'], item['user_id'], drinkId, drinkName, item['completed'], item['time'], item['robot_id'])
                 orders.append(order)
             self.render("static/html/bartender.html", orders=orders, drinks=drinks)
 
     @tornado.gen.coroutine
     def post(self):
         id = self.get_argument("orderId", default=None)
+        print("marking as complete!", id)
         if(id):
             id = int(id)
             sql = """
                 UPDATE orders
-                SET completed=%s
+                SET completed=TRUE
                 WHERE id=%s;
             """
-            cursor = yield self.db().execute(sql, (True, id))
+            cursor = yield self.db().execute(sql, (id, ))
+            
+            sql = """ SELECT  id, user_id, drink_id, completed, time, robot_id, priority
+                      FROM orders
+                  """
+            c = yield self.db().execute(sql)
+            print(c.fetchall())
 
         self.redirect("/")
 
@@ -221,12 +229,13 @@ class ApiOrderHandler(PostgresHandler):
         drink_id = self.get_argument("drinkId", default = None)
         if(drink_id):
             dt = datetime.now()
+            print(dt)
             drink_id = int(drink_id)
             sql ="""
-                INSERT INTO orders(user_id, drink_id, completed, time, quantity)
-                VALUES (%s, %s, FALSE, %s, 1)
+                INSERT INTO orders(user_id, drink_id, completed, time, robot_id, priority)
+                VALUES (%s, %s, FALSE, %s, %s, %s)
                 """
-            order_cursor = yield self.db().execute(sql, (self.get_current_user(), drink_id, dt))
+            order_cursor = yield self.db().execute(sql, (self.get_current_user(), drink_id, dt, "-1", 1000))
             self.redirect("/about/")
         else:
             self.write("Order Failed!")
@@ -247,11 +256,7 @@ class ApiCustomerHandler(PostgresHandler):
 class SetUpHandler(PostgresHandler):
     @tornado.gen.coroutine
     def get(self):
-        self.write("What are you doing here?")
-        self.finish()
-
-    @tornado.gen.coroutine
-    def post(self):
+        print("initializing")
         
         # USER TABLE INIT
         user_sql = """
@@ -286,15 +291,20 @@ class SetUpHandler(PostgresHandler):
                     user_id integer REFERENCES users(id) ON UPDATE CASCADE ON DELETE CASCADE,
                     drink_id integer REFERENCES drinks(id) ON UPDATE CASCADE ON DELETE CASCADE,
                     completed boolean DEFAULT FALSE,
-                    time timestamp
+                    time timestamp,
+                    robot_id integer DEFAULT -1,
+                    priority integer
                 );
                 ALTER SEQUENCE order_id OWNED BY orders.id;
             """
         order_cursor = yield self.db().execute(order_sql)
 
+        sql = """ DELETE FROM orders """
+        yield self.db().execute(sql)
+
         self.write("DONE\n")
         self.finish()
-
+        
 class BatBotApplication(tornado.web.Application):
     def __init__(self, ioloop):
         logging.info("Starting logging!")
@@ -303,7 +313,7 @@ class BatBotApplication(tornado.web.Application):
         handlers = [
             #TODO tune these regex
             (r"/?", RootHandler),
-            (r"/setup/", SetUpHandler),
+            (r"/setup/?", SetUpHandler),
             (r"/customer/?", CustomerHandler),
             (r"/bartender/?", BartenderHandler),
             (r"/menu/?", MenuHandler),
@@ -324,13 +334,12 @@ class BatBotApplication(tornado.web.Application):
             "debug": True,
             "autoreload": True,
         }
-
         tornado.web.Application.__init__(self, handlers, **settings)
 
-        dsn = 'dbname=barbotdb user=barbotdev password=icanswim ' \
-                  'host=localhost port=5432'
+        dsn = 'dbname=template1 user=Kim password=icanswim' \
+                  'host=localhost port=10601'
 
-        self.db = momoko.Pool(dsn=dsn, size=1, ioloop=ioloop)
+        self.db = momoko.Pool(dsn=dsn, size=2, ioloop=ioloop)
         self.bartender = [1,2]
 
 
