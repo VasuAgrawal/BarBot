@@ -337,7 +337,7 @@ void computeDistanceResp() {
                 dist_buf_idx = 0;
             }
         }
-        else if (validate_frame(rx_buffer, MSG_TYPE_SWITCH)) {
+        else if (validate_frame(rx_buffer, MSG_TYPE_SWITCH) == 0) {
             // Switch to master mode
             is_master = true;
             deca_sleep(1000);
