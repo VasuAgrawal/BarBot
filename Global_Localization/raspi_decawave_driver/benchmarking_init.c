@@ -247,6 +247,8 @@ int main(int argc, char *argv[]) {
     dwt_setrxantennadelay(RX_ANT_DLY);
     dwt_settxantennadelay(TX_ANT_DLY);
 
+    dwt_setrxtimeout(RESP_RX_TIMEOUT_UUS);
+
     /* Loop forever initiating ranging exchanges. */
     while (1) {
     	computeDistanceInit();
