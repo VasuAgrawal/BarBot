@@ -93,10 +93,10 @@ class DW(object):
         # that update if yes.
         if time % self.freq == 0 and not np.random.binomial(1, self.dropout):
             # Add a maximum distance to be slightly more realistic
-            dist = self.distance(dest_pos)
-            if dist < 5:
-                return dist
-            # return self.distance(dest_pos)
+            # dist = self.distance(dest_pos)
+            # if dist < 5:
+                # return dist
+            return self.distance(dest_pos)
         return None
 
 
@@ -260,7 +260,7 @@ class GLS(object):
 def main():
     np.random.seed(1)
     logging.root.setLevel(logging.DEBUG)
-    gls = GLS(beacons=6, wristbands = 2)
+    gls = GLS(beacons=8, wristbands = 4)
     # threading.Thread(target=gls.display).start()
     while True:
         gls.step()
