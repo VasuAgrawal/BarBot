@@ -56,6 +56,7 @@ class DataRecvServer(tornado.tcpserver.TCPServer):
 
             message = DwDistance()
             message.ParseFromString(message_bytes)
+            logging.debug("Server received message %s", message)
             messages.put(message)
 
 
@@ -514,7 +515,7 @@ class Solver(object):
                 
 
 def main():
-    logging.root.setLevel(logging.INFO)
+    logging.root.setLevel(logging.DEBUG)
 
     # All of these could totally be their own separate ROS nodes ...
     server = DataRecvServer()
