@@ -10,8 +10,7 @@
  *
  * @author Decawave
  */
-#include <wiringPi.h>
-#include <wiringPiSPI.h>
+
 #include <stdio.h>
 #include <deca_device_api.h>
 #include <deca_regs.h>
@@ -77,9 +76,13 @@ void rxGoodISR(const dwt_cb_data_t *cbData) {
     dwt_rxenable(DWT_START_RX_IMMEDIATE);
 }
 
-void delayThread() {
-    while(1) {
-        deca_sleep(1000);
+void pollThread() {
+    /* Enable "interrupt-based" functionality by polling in this thread and calling dwt_isr to perform the appropriate callback */
+    int status;
+    int interrupts = SYS_STATUS_RXFCE | SYS_STATUS_RXFCG | SYS_STATUS_RXRFSL | SYS_STATUS_RXPHE;
+    while (1) {
+        while (!((status_reg = dwt_read32bitreg(SYS_STATUS_ID)) & interrupts));
+        dwt_isr();
     }
 }
 
@@ -109,14 +112,13 @@ int main(void)
 
     /* Set up interrupt handlers */
     dwt_setcallbacks(NULL, rxGoodISR, NULL, rxErrorISR);
-    dwt_setinterrupt(DWT_INT_RFCG | DWT_INT_RFCE | DWT_INT_RPHE, 1);
+    //dwt_setinterrupt(DWT_INT_RFCG | DWT_INT_RFCE | DWT_INT_RPHE, 1);
 
     /* Activate reception immediately. See NOTE 3 below. */
     dwt_rxenable(DWT_START_RX_IMMEDIATE);
 
-    /* Loop forever receiving frames. */
-    std::thread rxThread(delayThread);
-    rxThread.join();
+    std::thread pollingThread(pollThread);
+    pollingThread.join();
 }
 
 /*****************************************************************************************************************************************************

@@ -10,8 +10,6 @@
  *
  * @author Decawave
  */
-#include <wiringPi.h>
-#include <wiringPiSPI.h>
 #include <stdio.h>
 #include <deca_device_api.h>
 #include <deca_regs.h>
@@ -53,22 +51,13 @@ void txDoneISR(const dwt_cb_data_t *cbData) {
     dwt_write32bitreg(SYS_STATUS_ID, SYS_STATUS_TXFRS);
 }
 
-void sendPeriodicMessages() {
-    /* Loop forever sending frames periodically. */
-    while(1)
-    {
-        /* Write frame data to DW1000 and prepare transmission. See NOTE 4 below.*/
-        dwt_writetxdata(sizeof(tx_msg), tx_msg, 0); /* Zero offset in TX buffer. */
-        dwt_writetxfctrl(sizeof(tx_msg), 0, 0); /* Zero offset in TX buffer, no ranging. */
-
-        /* Start transmission. */
-        dwt_starttx(DWT_START_TX_IMMEDIATE);
-
-        /* Execute a delay between transmissions. */
-        deca_sleep(TX_DELAY_MS);
-
-        /* Increment the blink frame sequence number (modulo 256). */
-        tx_msg[BLINK_FRAME_SN_IDX]++;
+void pollThread() {
+    /* Enable "interrupt-based" functionality by polling in this thread and calling dwt_isr to perform the appropriate callback */
+    int status;
+    int interrupts = SYS_STATUS_TXFRS;
+    while (1) {
+        while (!((status = dwt_read32bitreg(SYS_STATUS_ID)) & interrupts));
+        dwt_isr();
     }
 }
 
@@ -77,13 +66,10 @@ void sendPeriodicMessages() {
  */
 int main(void)
 {
-    // Initialize platform-specific hardware
+    /* Initialize platform-specific hardware */
     raspiDecawaveInit();
 
-    /* Reset and initialise DW1000. See NOTE 2 below.
-     * For initialisation, DW1000 clocks must be temporarily set to crystal speed. After initialisation SPI rate can be increased for optimum
-     * performance. */
-    //reset_DW1000(); /* Target specific drive of RSTn line into DW1000 low for a period. */
+    /* Initialize Decawave */
     if (dwt_initialise(DWT_LOADNONE) == DWT_ERROR)
     {
         printf("DWM1000: Initialization Failed!\n");
@@ -100,12 +86,26 @@ int main(void)
     printf("DWM1000: Device ID %x\n", deviceId);
 
     /* Set up interrupts */
-    dwt_setinterrupt(DWT_INT_TFRS, 1);
+    //dwt_setinterrupt(DWT_INT_TFRS, 1);
     dwt_setcallbacks(txDoneISR, NULL, NULL, NULL);
 
-    /* Loop forever sending frames periodically. */
-    std::thread txThread(sendPeriodicMessages);
-    txThread.join();
+    std::thread pollingThread(pollThread);
+
+    while(1)
+    {
+        /* Write frame data to DW1000 and prepare transmission. See NOTE 4 below.*/
+        dwt_writetxdata(sizeof(tx_msg), tx_msg, 0); /* Zero offset in TX buffer. */
+        dwt_writetxfctrl(sizeof(tx_msg), 0, 0); /* Zero offset in TX buffer, no ranging. */
+
+        /* Start transmission. */
+        dwt_starttx(DWT_START_TX_IMMEDIATE);
+
+        /* Execute a delay between transmissions. */
+        deca_sleep(TX_DELAY_MS);
+
+        /* Increment the blink frame sequence number (modulo 256). */
+        tx_msg[BLINK_FRAME_SN_IDX]++;
+    }
 }
 
 /*****************************************************************************************************************************************************
