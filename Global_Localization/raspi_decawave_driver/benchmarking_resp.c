@@ -220,14 +220,6 @@ int computeDistanceResp() {
                     tof = tof_dtu * DWT_TIME_UNITS;
                     distance = tof * SPEED_OF_LIGHT;
 
-                    printf("DWT_TIME_UNITS: %1.15f", DWT_TIME_UNITS);
-
-                    printf("Ra: %3.2f\n", Ra);
-                    printf("Rb: %3.2f\n", Rb);
-                    printf("Da: %3.2f\n", Da);
-                    printf("Db: %3.2f\n", Db);
-                    printf("ToF DTU: %llu\n", tof_dtu);
-                    printf("ToF: %3.2f\n", tof);
                     printf("Distance: %3.2f\n", distance);
                     
                     /* Send final message as acknowledgment */
@@ -256,7 +248,7 @@ int computeDistanceResp() {
                }
             }
             else {
-                printf("Timeout/error 2\n");
+                //printf("Timeout/error 2\n");
                 /* Clear RX error/timeout events in the DW1000 status register. */
                 dwt_write32bitreg(SYS_STATUS_ID, SYS_STATUS_ALL_RX_TO | SYS_STATUS_ALL_RX_ERR);
 
@@ -365,7 +357,7 @@ int main(int argc, char *argv[])
         if (retval == 0) {
             successCount++;
             printf("%3.5f\n", distance);
-            if (successCount == 10) {
+            if (successCount == 100) {
                 break;
             }
         }
