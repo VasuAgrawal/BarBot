@@ -66,10 +66,11 @@ static uint8 switch_msg[] = {0x41, 0x88, 0xCA, 0xDE, 'W', 'A', 'V', 'E', MSG_TYP
 #define FINAL_MSG_TS_LEN 4
 #define MSG_DEST_ADDR_IDX 4
 #define MSG_SRC_ADDR_IDX 6
+#define MSG_TYPE_IDX 8
 
 /* Buffer to store received response message.
  * Its size is adjusted to longest frame that this example code is supposed to handle. */
-#define RX_BUF_LEN 24
+#define RX_BUF_LEN 23
 static uint8 rx_buffer[RX_BUF_LEN];
 
 /* Hold copy of status register state here for reference so that it can be examined at a debug breakpoint. */
@@ -529,15 +530,15 @@ static int validate_frame(uint8* frame, uint8 expected_type) {
 		return -1;
 	}
 	/* Validate PAN ID */
-	if ((frame[3] != 0xCA) || (frame[4] != 0xDE)) {
+	if ((frame[2] != 0xCA) || (frame[3] != 0xDE)) {
 		return -1;
 	}
 	/* Validate that message is intended for this device */
-	if ((frame[5] != device_addr) || (frame[6] != device_addr)) {
+	if ((frame[MSG_DEST_ADDR_IDX] != device_addr) || (frame[MSG_DEST_ADDR_IDX+1] != device_addr)) {
 		return -1;
 	}
 	/* Validate that the message is of the expected type */
-	if (frame[9] != expected_type) {
+	if (frame[MSG_TYPE_IDX] != expected_type) {
 		return -1;
 	}
 	return 0;
