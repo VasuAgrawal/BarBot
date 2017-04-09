@@ -42,7 +42,7 @@ static uint8 tx_msg[] = {0xC5, 0, 'D', 'E', 'C', 'A', 'W', 'A', 'V', 'E', 0, 0};
 #define BLINK_FRAME_SN_IDX 1
 
 /* Inter-frame delay period, in milliseconds. */
-#define TX_DELAY_MS 1000
+#define TX_DELAY_MS 100
 
 typedef unsigned long long uint64;
 
@@ -61,7 +61,7 @@ int main(void)
      * For initialisation, DW1000 clocks must be temporarily set to crystal speed. After initialisation SPI rate can be increased for optimum
      * performance. */
     //reset_DW1000(); /* Target specific drive of RSTn line into DW1000 low for a period. */
-    if (dwt_initialise(DWT_LOADNONE) == DWT_ERROR)
+    if (dwt_initialise(DWT_LOADUCODE) == DWT_ERROR)
     {
         printf("DWM1000: Initialization Failed!\n");
         while (1)
@@ -88,8 +88,6 @@ int main(void)
 
         /* Start transmission. */
         dwt_starttx(DWT_START_TX_IMMEDIATE);
-
-        printf("Started\n");
 
         /* Poll DW1000 until TX frame sent event set. See NOTE 5 below.
          * STATUS register is 5 bytes long but, as the event we are looking at is in the first byte of the register, we can use this simplest API
@@ -129,14 +127,11 @@ static uint64 get_tx_timestamp_u64(void)
     uint64 ts = 0;
     int i;
     dwt_readtxtimestamp(ts_tab);
-    printf("tx buf: ");
     for (i = 4; i >= 0; i--)
     {
-        printf("|%d", ts_tab[i]);
         ts <<= 8;
         ts |= ts_tab[i];
     }
-    printf("|\n");
     return ts;
 }
 
@@ -156,14 +151,11 @@ static uint64 get_rx_timestamp_u64(void)
     uint64 ts = 0;
     int i;
     dwt_readrxtimestamp(ts_tab);
-    printf("rx buf: ");
     for (i = 4; i >= 0; i--)
     {
-        printf("|%d", ts_tab[i]);
         ts <<= 8;
         ts |= ts_tab[i];
     }
-    printf("|\n");
     return ts;
 }
 

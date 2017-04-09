@@ -56,7 +56,7 @@ int main(void)
     raspiDecawaveInit();
 
     /* Initialize */
-    if (dwt_initialise(DWT_LOADNONE) == DWT_ERROR)
+    if (dwt_initialise(DWT_LOADUCODE) == DWT_ERROR)
     {
         printf("DWM1000: Initialization Failed!\n");
         while (1)
@@ -136,14 +136,11 @@ static uint64 get_tx_timestamp_u64(void)
     uint64 ts = 0;
     int i;
     dwt_readtxtimestamp(ts_tab);
-    printf("tx buf: ");
     for (i = 4; i >= 0; i--)
     {
-        printf("|%d", ts_tab[i]);
         ts <<= 8;
         ts |= ts_tab[i];
     }
-    printf("|\n");
     return ts;
 }
 
@@ -163,14 +160,11 @@ static uint64 get_rx_timestamp_u64(void)
     uint64 ts = 0;
     int i;
     dwt_readrxtimestamp(ts_tab);
-    printf("rx buf: ");
     for (i = 4; i >= 0; i--)
     {
-        printf("|%d", ts_tab[i]);
         ts <<= 8;
         ts |= ts_tab[i];
     }
-    printf("|\n");
     return ts;
 }
 
