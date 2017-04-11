@@ -1,5 +1,4 @@
 #!/usr/bin/env python
-from datetime import datetime
 import rospy
 from barbot.msg import State, Waypoint, Thruster
 from geometry_msgs.msg import Pose2D
@@ -16,10 +15,10 @@ class Controller(object):
         self.error = 0.0
         self.theta_threshold = 0.1
         self.turn_speed = 10
-        self.last_time = datetime.now()
         self.last_error = 0.0
 
         rospy.init_node(name)
+        self.last_time = rospy.get_time()
         self.rate = rospy.Rate(30)
         self.thruster_pub = rospy.Publisher(thruster_topic, Thruster, queue_size=1)
 
@@ -37,6 +36,7 @@ class Controller(object):
             # angle differs by a lot, turn the robot, this can just be hardcoded because PID fixes slight differences
             if(abs(error) > theta_threshold):
                 msg = Thruster()
+                msg.header.stamp = rospy.Time.now()
                 msg.left = math.copysign(self.turn_speed, error)
                 msg.right =- math.copysign(self.turn_speed, error)
                 self.thruster_pub.publish(msg)
@@ -44,19 +44,18 @@ class Controller(object):
             else:
                 self.error += error
 
-                now = datetime.now()
+                now = rospy.get_time()
                 dt = now-self.last_time
                 derr = error-self.last_error
 
-                dterm = derr / dt.total_seconds()
-
-                # ignore kd for now 
+                dterm = derr / dt
                 change = error*self.kp + self.error*self.ki + dterm*self.kd
 
                 self.last_time = now
                 self.last_error = error
 
                 msg = Thruster()
+                msg.header.stamp = rospy.Time.now()
                 msg.left = self.speed + change
                 msg.right = self.speed - change
                 self.thruster_pub.publish(msg)
@@ -66,6 +65,7 @@ class Controller(object):
                 # Do PID control here to figure out thrusters
         else:
             msg = Thruster()
+            msg.header.stamp = rospy.Time.now()
             msg.left = 0.
             msg.right = 0.
             self.thruster_pub.publish(msg)

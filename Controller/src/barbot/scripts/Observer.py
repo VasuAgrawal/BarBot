@@ -19,6 +19,7 @@ class Observer(object):
             self.state.vel.x = 0
             self.state.vel.y = 0
             self.state.vel.theta = 0
+            self.state.header.stamp = rospy.Time.now()
 
             self.pub.publish(self.state)
             self.rate.sleep()
