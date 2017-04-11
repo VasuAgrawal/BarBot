@@ -5,6 +5,7 @@ ENDIANNESS = "little"
 def make_packet_from_bytes(data_bytes):
     # Just do a length encoding of the data bytes
     try:
+        # Unsigned integer
         header = len(data_bytes).to_bytes(HEADER_LEN, ENDIANNESS)
     except OverflowError as e:
         # The data is too long to fit, so we have to do something.

@@ -46,7 +46,7 @@ class DataRecvServer(tornado.tcpserver.TCPServer):
     # then process the messages separately later.
     @tornado.gen.coroutine
     def handle_stream(self, stream, address): 
-        logging.debug("Opened stream from address %s", address)
+        logging.info("Opened stream from address %s", address)
         while True:
             try:
                 # Continually read data from the stream
@@ -56,7 +56,7 @@ class DataRecvServer(tornado.tcpserver.TCPServer):
 
             message = DwDistance()
             message.ParseFromString(message_bytes)
-            logging.debug("Server received message %s", message)
+            logging.debug("Server received message:\n%s", message)
             messages.put(message)
 
 
