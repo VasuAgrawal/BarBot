@@ -380,10 +380,11 @@ UsedLibrary="C:/EAGLE 8.0.1/lbr/xilinx-xc9.lbr"
 UsedLibrary="C:/EAGLE 8.0.1/lbr/xilinx-xcv.lbr"
 UsedLibrary="C:/EAGLE 8.0.1/lbr/zetex.lbr"
 UsedLibrary="C:/EAGLE 8.0.1/lbr/zilog.lbr"
+UsedLibrary="C:/EAGLE 8.0.1/lbr/adafruit.lbr"
 
 [Win_1]
 Type="Control Panel"
-Loc="216 344 1889 1418"
+Loc="105 180 1304 779"
 State=2
 Number=0
 

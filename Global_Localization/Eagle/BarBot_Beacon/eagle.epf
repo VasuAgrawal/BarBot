@@ -383,7 +383,7 @@ UsedLibrary="C:/EAGLE 8.0.1/lbr/zilog.lbr"
 
 [Win_1]
 Type="Control Panel"
-Loc="535 302 2253 1440"
+Loc="105 180 1304 779"
 State=2
 Number=0
 
