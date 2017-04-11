@@ -20,10 +20,11 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include <deca_device_api.h>
 #include <deca_regs.h>
 #include <raspi_init.h>
-#include <string.h>
+#include "dwdistance.pb.h"
 
 /* Example application name and version to display on LCD screen. */
 #define APP_NAME "Decawave Beacon Network - Master"
