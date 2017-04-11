@@ -10,13 +10,18 @@ class Observer(object):
         self.rate = rospy.Rate(30)
         self.pub = rospy.Publisher(state_topic, State, queue_size=1)
         self.state = State()
-
-    def publish_state(self):
         while not rospy.is_shutdown():
 
             #Calculate state here!!
+            self.state.pose.x = 0
+            self.state.pose.y = 0
+            self.state.pose.theta = 0
+            self.state.vel.x = 0
+            self.state.vel.y = 0
+            self.state.vel.theta = 0
+
             self.pub.publish(self.state)
-            rate.sleep()
+            self.rate.sleep()
 
 
 
