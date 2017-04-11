@@ -2,7 +2,7 @@ syntax = "proto3";
 
 message DwDistance {
     reserved 1;
-    reserved timestamp;
+    reserved "timestamp";
     uint32 send_id = 2;
     uint32 recv_id = 3;
     double dist = 4;
