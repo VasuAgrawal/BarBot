@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-
+from datetime import datetime
 import rospy
 from barbot.msg import State, Waypoint, Thruster
 from geometry_msgs.msg import Pose2D
@@ -16,6 +16,8 @@ class Controller(object):
         self.error = 0.0
         self.theta_threshold = 0.1
         self.turn_speed = 10
+        self.last_time = datetime.now()
+        self.last_error = 0.0
 
         rospy.init_node(name)
         self.rate = rospy.Rate(30)
@@ -42,8 +44,17 @@ class Controller(object):
             else:
                 self.error += error
 
+                now = datetime.now()
+                dt = now-self.last_time
+                derr = error-self.last_error
+
+                dterm = derr / dt.total_seconds()
+
                 # ignore kd for now 
-                change = error*self.kp + self.error*self.ki
+                change = error*self.kp + self.error*self.ki + dterm*self.kd
+
+                self.last_time = now
+                self.last_error = error
 
                 msg = Thruster()
                 msg.left = self.speed + change
