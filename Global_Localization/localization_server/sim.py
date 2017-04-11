@@ -42,11 +42,29 @@ class DW(object):
         self.beacon = beacon
         self.period = period
 
+        # Hard code some positions for now
+        beacon_pos = [
+                [ 0,  0, 3], # 0
+                [ 4,  0, 3.25], # 1
+                [10,  0, 3], # 2
+                [10,  5, 2.75], # 3
+                [10, 10, 3], # 4
+                [ 6, 10, 3.25], # 5
+                [ 0, 10, 3], # 6
+                [ 0, 4,  2.75], # 7
+        ]
+
         if pos is None:
             if self.beacon:
-                self.x = np.random.random() * 10 # X in [0, 10)
-                self.y = np.random.random() * 10 # Y in [0, 10)
-                self.z = np.random.random() * 2 + 2 # Z in [2, 4)
+                if 0 <= tag < len(beacon_pos):
+                    pos = np.array(beacon_pos[tag])
+                    self.x = pos[0]
+                    self.y = pos[1]
+                    self.z = pos[2]
+                else:
+                    self.x = np.random.random() * 10 # X in [0, 10)
+                    self.y = np.random.random() * 10 # Y in [0, 10)
+                    self.z = np.random.random() * 2 + 2 # Z in [2, 4)
             else:
                 self.x = np.random.random() * 8 + 1 # X in [1, 9)
                 self.y = np.random.random() * 8 + 1 # Y in [1, 9)

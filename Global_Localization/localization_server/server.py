@@ -46,7 +46,7 @@ class DataRecvServer(tornado.tcpserver.TCPServer):
     # then process the messages separately later.
     @tornado.gen.coroutine
     def handle_stream(self, stream, address): 
-        logging.info("Opened stream from address %s", address)
+        logging.debug("Opened stream from address %s", address)
         while True:
             try:
                 # Continually read data from the stream
@@ -235,7 +235,6 @@ class Visualizer(object):
 
         if xs and ys and zs:
             ax.plot(xs, ys, zs)
-            logging.info("Plotted points:\nX: %s\nY: %s\nZ: %s", xs, ys, zs)
 
             ax.set_xlim((min(xs), max(xs)))
             ax.set_ylim((min(ys), max(ys)))
@@ -278,6 +277,7 @@ class Solver(object):
         self._beacon_pdist = []
         self._num_beacons = 0
 
+        self._beacon_stable_threshold = .1
         self._beacon_pos_guess = dict()
         self._guess_points = []
   
@@ -444,12 +444,69 @@ class Solver(object):
                 gradients[i] *= num_points / (num_points - skip_count)
 
             guess_points -= .005 * gradients
-            # loss = np.power(measured - measured_guess, 2).sum()
             loss = self._distance_loss(measured, measured_guess)
             if loss < thresh:
                 break
             itercount += 1
         return (guess_points, loss)
+
+
+    def _solve_beacons(self):
+        # At this point, we know that we have a "solvable" set of distances
+        # in the beacon pdist matrix. We invoke gradient descent to generate
+        # a solution.
+
+        if len(self._beacon_pos_guess) != self._num_beacons:
+            # If we've added beacons since the last iteration, throw away
+            # all of our guesses and start over a few times, picking the
+            # best random initialization out of the lot.
+            best_guess_points = None
+            best_loss = math.inf
+            for i in range(10):
+                guess_points, loss = self.GD(self._beacon_pdist,
+                        self._gd_init())
+                if loss < best_loss:
+                    best_loss = loss
+                    best_guess_points = guess_points
+                logging.debug("Iteration with random init found loss of %f",
+                        loss)
+
+            # Store the best guess points
+            self._guess_points = best_guess_points
+
+        else:
+            # We're simply refining our previous approach, so pass in the
+            # previous best guess rather than an entirely new set. The
+            # algorithm is deterministic with respect to the starting
+            # coordinates, so there's no point in doing this again.
+            self._guess_points, best_loss = self.GD(self._beacon_pdist,
+                    self._guess_points)
+
+        logging.info("Beacon positions calculated with loss %f:\n%s", 
+                best_loss, self._guess_points)
+
+        if best_loss <= self._beacon_stable_threshold:
+            logging.info("Beacon points are stable!")
+            self._beacon_pos_stable = True
+        else:
+            logging.info("Beacon points are NOT stable, still improving.")
+            self._beacon_pos_stable = False
+
+
+        for i, guess in enumerate(self._guess_points):
+            idx = self._beacon_idx[i]
+            dwm_id = self._dwm_idx_mapping_inv[idx]
+            self._beacon_pos_guess[dwm_id] = guess
+        
+        logging.info("Guess points calculated and related to indices:\n%s\n",
+                        pprint.pformat(self._beacon_pos_guess))
+
+        # Update the global guess points
+        global beacon_pos_lock
+        with beacon_pos_lock:
+            global beacon_pos_guess
+            global beacon_pos_stable
+            beacon_pos_guess = self._beacon_pos_guess
 
 
     def solve(self):
@@ -463,59 +520,13 @@ class Solver(object):
                 self._data_delay()
                 continue
 
-            # At this point, we know that we have a "solvable" set of distances
-            # in the beacon pdist matrix. We invoke gradient descent to generate
-            # a solution.
             start_time = time.time()
-
-            if len(self._beacon_pos_guess) != self._num_beacons:
-                # If we've added beacons since the last iteration, throw away
-                # all of our guesses and start over a few times, picking the
-                # best random initialization out of the lot.
-                best_guess_points = None
-                best_loss = math.inf
-                for i in range(10):
-                    guess_points, loss = self.GD(self._beacon_pdist,
-                            self._gd_init())
-                    if loss < best_loss:
-                        best_loss = loss
-                        best_guess_points = guess_points
-                    logging.debug("Iteration with random init found loss of %f",
-                            loss)
-
-                # Store the best guess points
-                self._guess_points = best_guess_points
-
-            else:
-                # We're simply refining our previous approach, so pass in the
-                # previous best guess rather than an entirely new set. The
-                # algorithm is deterministic with respect to the starting
-                # coordinates, so there's no point in doing this again.
-                self._guess_points, best_loss = self.GD(self._beacon_pdist,
-                        self._guess_points)
-
-            logging.debug("Guess points calculated with loss %f:\n%s", 
-                    best_loss, self._guess_points)
-
-            for i, guess in enumerate(self._guess_points):
-                idx = self._beacon_idx[i]
-                dwm_id = self._dwm_idx_mapping_inv[idx]
-                self._beacon_pos_guess[dwm_id] = guess
-            
-            logging.info("Guess points calulated and related to indices:\n%s",
-                         pprint.pformat(self._beacon_pos_guess))
-
-            # Update the global guess points
-            global beacon_pos_lock
-            with beacon_pos_lock:
-                global beacon_pos_guess
-                beacon_pos_guess = self._beacon_pos_guess
-
+            self._solve_beacons()
             time.sleep(max(0, 1 - (time.time() - start_time)))
                 
 
 def main():
-    logging.root.setLevel(logging.DEBUG)
+    logging.root.setLevel(logging.INFO)
 
     # All of these could totally be their own separate ROS nodes ...
     server = DataRecvServer()
