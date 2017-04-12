@@ -20,13 +20,23 @@
 
 #include <stdio.h>
 #include <stdlib.h>
-#include <string.h>
+#include <iostream>
+#include <string>
+#include <unistd.h>
+
 #include <deca_device_api.h>
 #include <deca_regs.h>
 #include <raspi_init.h>
+#include <dwdistance.pb.h>
+#include <pb_encode.h>
+
+#include <netinet/in.h>
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <netdb.h>
 
 /* Inter-ranging delay period, in milliseconds. */
-#define RNG_DELAY_MS 5
+#define RNG_DELAY_MS 10
 
 /* Default communication configuration. We use here EVK1000's default mode (mode 3). */
 static dwt_config_t config = {
@@ -73,6 +83,11 @@ static uint8 switch_msg[] = {0x41, 0x88, 0xCA, 0xDE, 'W', 'A', 'V', 'E', MSG_TYP
 #define RX_BUF_LEN 23
 static uint8 rx_buffer[RX_BUF_LEN];
 
+/* Proto message and buffer */
+static DwDistance distanceProto;
+static uint8_t protoBuffer[DwDistance_size];
+static pb_ostream_t protoStream;
+
 /* Hold copy of status register state here for reference so that it can be examined at a debug breakpoint. */
 static uint32 status_reg = 0;
 
@@ -110,10 +125,14 @@ static double distance;
 /* ID of the current device */
 static uint8 device_addr;
 
+/* Variables for handling initialization of network positions */
 static int num_devices;
 static int num_measurements;
 static bool is_master;
 static bool was_previous_master;
+
+/* File descriptor of the server */
+static int serverfd;
 
 /* Declaration of static functions. */
 static uint64 get_tx_timestamp_u64(void);
@@ -285,6 +304,39 @@ void computeDistanceResp() {
             tof = tof_dtu * DWT_TIME_UNITS;
             distance = tof * SPEED_OF_LIGHT;
 
+            /* Transmit distance to server */
+            /* Fill out fields in proto */
+            distanceProto.dist = distance;
+            distanceProto.send_id = rx_buffer[MSG_SRC_ADDR_IDX];
+            distanceProto.recv_id = rx_buffer[MSG_DEST_ADDR_IDX];
+            distanceProto.beacon = true;
+
+            /* Serialize proto and encode size into header for sending to server */
+            pb_encode(&protoStream, DwDistance_fields, &distanceProto);
+            uint32_t byte_size = protoStream.bytes_written;
+            printf("Serialized size: %d\n", byte_size);
+
+            uint8_t *bytes = new uint8_t[4 + byte_size];
+
+            /* Little endian encoding of packet size */
+            bytes[0] = (byte_size >> 0) & 0xFF;
+            bytes[1] = (byte_size >> 8) & 0xFF;
+            bytes[2] = (byte_size >> 16) & 0xFF;
+            bytes[3] = (byte_size >> 24) & 0xFF;
+
+            for (int i = 0; i < byte_size; i++) {
+                bytes[i+4] = protoBuffer[i];
+                std::cout << std::to_string((int)bytes[i]) << ", ";
+            }
+            std::cout << std::endl;
+
+            /* Attempt to send the array over the socket */
+            if (write(serverfd, bytes, 4 + byte_size) < 0) {
+                printf("Error in writing to socket!\n");
+            }
+
+            delete[] bytes;
+
             printf("%3.2f\n", distance);
             return;
         }
@@ -330,6 +382,54 @@ void switchMaster() {
     }
 
     is_master = false;
+}
+
+// Makes one attempt at connecting to the server at the given destination. A
+// failure is indicated with a negative number. Implement some try-again logic
+// above this if you want.
+int connect_to_server(std::string addr, std::string port) {
+  struct addrinfo hints, *listp, *p;
+  memset(&hints, 0, sizeof hints);
+  hints.ai_family = AF_INET; // IPv4
+  hints.ai_socktype = SOCK_STREAM; // TCP?
+  hints.ai_flags = AI_NUMERICSERV;
+  hints.ai_flags |= AI_ADDRCONFIG;
+
+  int rv;
+  if ((rv = getaddrinfo(addr.c_str(), port.c_str(), &hints, &listp)) != 0) {
+    std::cerr << "Error in getaddrinfo: " << gai_strerror(rv) << std::endl;
+    freeaddrinfo(listp);
+    return -1;
+  }
+
+  int fd;
+  for (p = listp; ; p = p->ai_next) {
+    // Create a socket descriptor
+    if ((fd = socket(p->ai_family, p->ai_socktype, p->ai_protocol)) < 0) {
+      std::cerr << "Error in creating socket." << std::endl;
+      continue;
+    }
+
+    // Attempt to connect to that socket descriptor.
+    if (connect(fd, p->ai_addr, p->ai_addrlen) < 0) {
+      std::cerr << "Error in connecting to socket." << std::endl;
+      close(fd);
+      continue;
+    }
+    
+    // If we get here, we know that we've successfully connected probably.
+    break;
+  }
+
+  // Check to make sure that we don't have a null thing.
+  if (p == nullptr) {
+    std::cerr << "Failed to connect" << std::endl;
+    freeaddrinfo(listp);
+    return -2;
+  }
+
+  freeaddrinfo(listp);
+  return fd;
 }
 
 /**
@@ -384,7 +484,16 @@ int main(int argc, char *argv[]) {
     /* Set up messages with appropriate IDs */
     set_msg_addresses(0, device_addr);
 
-    int retval;
+    /* Initialize protobuf stream */
+    protoStream = pb_ostream_from_buffer(protoBuffer, sizeof(protoBuffer));
+
+    /* Connect to server */
+    std::string addr = "localhost";
+    std::string port = "8888";
+    if ((serverfd = connect_to_server(addr, port)) < 0) {
+        std::cout << "Unable to connect to server at " << addr << ":" << port << std::endl;
+        exit(serverfd);
+    }
 
     /* Loop forever initiating ranging exchanges. */
     while (1) {
