@@ -13,8 +13,8 @@ class Scheduler(object):
     def push(self, waypoint):
         self.pub.publish(waypoint)
 
-    # This function should connect to the actual scheduler, and push to robot as  required
-    def listener(self):
+    # This function should connect to the actual scheduler, and push to robot as required
+    def listen(self):
         pass
 
 

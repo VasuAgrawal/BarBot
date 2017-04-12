@@ -24,10 +24,6 @@
 #include <deca_device_api.h>
 #include <deca_regs.h>
 #include <raspi_init.h>
-#include "dwdistance.pb.h"
-
-/* Example application name and version to display on LCD screen. */
-#define APP_NAME "Decawave Beacon Network - Master"
 
 /* Inter-ranging delay period, in milliseconds. */
 #define RNG_DELAY_MS 5
@@ -56,29 +52,25 @@ static dwt_config_t config = {
 #define MSG_TYPE_SWITCH 0x32
 
 /* Frames used in the ranging process. See NOTE 2 below. */
-static uint8 tx_poll_msg[] = {0x41, 0x88, 0, 0xCA, 0xDE, 'W', 'A', 'V', 'E', MSG_TYPE_POLL, 0, 0};
-static uint8 rx_poll_msg[] = {0x41, 0x88, 0, 0xCA, 0xDE, 'W', 'A', 'V', 'E', MSG_TYPE_POLL, 0, 0};
-static uint8 tx_resp_msg[] = {0x41, 0x88, 0, 0xCA, 0xDE, 'V', 'E', 'W', 'A', MSG_TYPE_RESP, 0x02, 0, 0, 0, 0};
-static uint8 rx_resp_msg[] = {0x41, 0x88, 0, 0xCA, 0xDE, 'V', 'E', 'W', 'A', MSG_TYPE_RESP, 0x02, 0, 0, 0, 0};
-static uint8 tx_final_msg[] = {0x41, 0x88, 0, 0xCA, 0xDE, 'W', 'A', 'V', 'E', MSG_TYPE_FINAL, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
-static uint8 rx_final_msg[] = {0x41, 0x88, 0, 0xCA, 0xDE, 'W', 'A', 'V', 'E', MSG_TYPE_FINAL, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
-static uint8 switch_msg[] = {0x41, 0x88, 0, 0xCA, 0xDE, 'W', 'A', 'V', 'E', MSG_TYPE_SWITCH, 0, 0};
-/* Length of the common part of the message (up to and including the function code, see NOTE 2 below). */
-#define ALL_MSG_COMMON_LEN 10
+static uint8 tx_poll_msg[] = {0x41, 0x88, 0xCA, 0xDE, 'W', 'A', 'V', 'E', MSG_TYPE_POLL, 0, 0};
+static uint8 rx_poll_msg[] = {0x41, 0x88, 0xCA, 0xDE, 'W', 'A', 'V', 'E', MSG_TYPE_POLL, 0, 0};
+static uint8 tx_resp_msg[] = {0x41, 0x88, 0xCA, 0xDE, 'V', 'E', 'W', 'A', MSG_TYPE_RESP, 0x02, 0, 0, 0, 0};
+static uint8 rx_resp_msg[] = {0x41, 0x88, 0xCA, 0xDE, 'V', 'E', 'W', 'A', MSG_TYPE_RESP, 0x02, 0, 0, 0, 0};
+static uint8 tx_final_msg[] = {0x41, 0x88, 0xCA, 0xDE, 'W', 'A', 'V', 'E', MSG_TYPE_FINAL, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+static uint8 rx_final_msg[] = {0x41, 0x88, 0xCA, 0xDE, 'W', 'A', 'V', 'E', MSG_TYPE_FINAL, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+static uint8 switch_msg[] = {0x41, 0x88, 0xCA, 0xDE, 'W', 'A', 'V', 'E', MSG_TYPE_SWITCH, 0, 0};
 /* Indexes to access some of the fields in the frames defined above. */
-#define ALL_MSG_SN_IDX 2
-#define FINAL_MSG_POLL_TX_TS_IDX 10
-#define FINAL_MSG_RESP_RX_TS_IDX 14
-#define FINAL_MSG_FINAL_TX_TS_IDX 18
+#define FINAL_MSG_POLL_TX_TS_IDX 9
+#define FINAL_MSG_RESP_RX_TS_IDX 13
+#define FINAL_MSG_FINAL_TX_TS_IDX 17
 #define FINAL_MSG_TS_LEN 4
-#define MSG_DEST_ADDR 5
-#define MSG_SRC_ADDR 7
-/* Frame sequence number, incremented after each transmission. */
-static uint8 frame_seq_nb = 0;
+#define MSG_DEST_ADDR_IDX 4
+#define MSG_SRC_ADDR_IDX 6
+#define MSG_TYPE_IDX 8
 
 /* Buffer to store received response message.
  * Its size is adjusted to longest frame that this example code is supposed to handle. */
-#define RX_BUF_LEN 24
+#define RX_BUF_LEN 23
 static uint8 rx_buffer[RX_BUF_LEN];
 
 /* Hold copy of status register state here for reference so that it can be examined at a debug breakpoint. */
@@ -96,10 +88,6 @@ static uint32 status_reg = 0;
 #define RESP_RX_TO_FINAL_TX_DLY_UUS 3100
 /* Receive response timeout. See NOTE 5 below. */
 #define RESP_RX_TIMEOUT_UUS 5400
-/* Receive final timeout. See NOTE 5 below. */
-#define FINAL_RX_TIMEOUT_UUS 3300
-/* Preamble timeout, in multiple of PAC size. See NOTE 6 below. */
-#define PRE_TIMEOUT 8
 
 /* Time-stamps of frames transmission/reception, expressed in device time units.
  * As they are 40-bit wide, we need to define a 64-bit int type to handle them. */
@@ -118,10 +106,6 @@ static uint64 final_rx_ts;
 /* Hold copies of computed time of flight and distance here for reference so that it can be examined at a debug breakpoint. */
 static double tof;
 static double distance;
-
-/* Data for averaging distance readings */
-static double dist_buf[10] = {0.f};
-static int dist_buf_idx = 0;
 
 /* ID of the current device */
 static uint8 device_addr;
@@ -150,7 +134,6 @@ int computeDistanceInit() {
     dwt_setrxtimeout(RESP_RX_TIMEOUT_UUS);
     
     /* Write frame data to DW1000 and prepare transmission. See NOTE 8 below. */
-    tx_poll_msg[ALL_MSG_SN_IDX] = frame_seq_nb;
     dwt_writetxdata(sizeof(tx_poll_msg), tx_poll_msg, 0); /* Zero offset in TX buffer. */
     dwt_writetxfctrl(sizeof(tx_poll_msg), 0, 1); /* Zero offset in TX buffer, ranging. */
 
@@ -160,9 +143,6 @@ int computeDistanceInit() {
 
     /* We assume that the transmission is achieved correctly, poll for reception of a frame or error/timeout. See NOTE 9 below. */
     while (!((status_reg = dwt_read32bitreg(SYS_STATUS_ID)) & (SYS_STATUS_RXFCG | SYS_STATUS_ALL_RX_TO | SYS_STATUS_ALL_RX_ERR)));
-
-    /* Increment frame sequence number after transmission of the poll message (modulo 256). */
-    frame_seq_nb++;
 
     if (status_reg & SYS_STATUS_RXFCG) {
         uint32 frame_len;
@@ -178,8 +158,6 @@ int computeDistanceInit() {
 
         /* Check that the frame is the expected response from the companion "DS TWR responder" example.
          * As the sequence number field of the frame is not relevant, it is cleared to simplify the validation of the frame. */
-        rx_buffer[ALL_MSG_SN_IDX] = 0;
-        //if (memcmp(rx_buffer, rx_resp_msg, ALL_MSG_COMMON_LEN) == 0) {
         if (validate_frame(rx_buffer, MSG_TYPE_RESP) == 0) {
             uint32 final_tx_time;
             int ret;
@@ -201,7 +179,6 @@ int computeDistanceInit() {
             final_msg_set_ts(&tx_final_msg[FINAL_MSG_FINAL_TX_TS_IDX], final_tx_ts);
 
             /* Write and send final message. See NOTE 8 below. */
-            tx_final_msg[ALL_MSG_SN_IDX] = frame_seq_nb;
             dwt_writetxdata(sizeof(tx_final_msg), tx_final_msg, 0); /* Zero offset in TX buffer. */
             dwt_writetxfctrl(sizeof(tx_final_msg), 0, 1); /* Zero offset in TX buffer, ranging. */
             ret = dwt_starttx(DWT_START_TX_DELAYED);
@@ -213,9 +190,6 @@ int computeDistanceInit() {
 
                 /* Clear TXFRS event. */
                 dwt_write32bitreg(SYS_STATUS_ID, SYS_STATUS_TXFRS);
-
-                /* Increment frame sequence number after transmission of the final message (modulo 256). */
-                frame_seq_nb++;
             }
         }
     }
@@ -262,27 +236,16 @@ void computeDistanceResp() {
 
         /* Check that the frame is a poll sent by "DS TWR initiator" example.
          * As the sequence number field of the frame is not relevant, it is cleared to simplify the validation of the frame. */
-        rx_buffer[ALL_MSG_SN_IDX] = 0;
-        //if (memcmp(rx_buffer, rx_poll_msg, ALL_MSG_COMMON_LEN) == 0) {
         if (validate_frame(rx_buffer, MSG_TYPE_POLL) == 0) {
             //uint32 resp_tx_time;
             int ret;
 
             /* Retrieve poll reception timestamp. */
             poll_rx_ts = get_rx_timestamp_u64();
-            
-            /* Set send time for response. See NOTE 9 below. */
-            //resp_tx_time = (poll_rx_ts + (POLL_RX_TO_RESP_TX_DLY_UUS * UUS_TO_DWT_TIME)) >> 8;
-            //dwt_setdelayedtrxtime(resp_tx_time * 2);
-
-            /* Set expected delay and timeout for final message reception. See NOTE 4 and 5 below. */
-            //dwt_setrxaftertxdelay(RESP_TX_TO_FINAL_RX_DLY_UUS);
-            //dwt_setrxtimeout(FINAL_RX_TIMEOUT_UUS);
-
+                       
             /* Write and send the response message. See NOTE 10 below.*/
-            tx_resp_msg[ALL_MSG_SN_IDX] = frame_seq_nb;
-            tx_resp_msg[MSG_DEST_ADDR] = rx_buffer[MSG_SRC_ADDR];
-            tx_resp_msg[MSG_DEST_ADDR+1] = rx_buffer[MSG_SRC_ADDR];
+            tx_resp_msg[MSG_DEST_ADDR_IDX] = rx_buffer[MSG_SRC_ADDR_IDX];
+            tx_resp_msg[MSG_DEST_ADDR_IDX+1] = rx_buffer[MSG_SRC_ADDR_IDX];
             dwt_writetxdata(sizeof(tx_resp_msg), tx_resp_msg, 0); /* Zero offset in TX buffer. */
             dwt_writetxfctrl(sizeof(tx_resp_msg), 0, 1); /* Zero offset in TX buffer, ranging. */
             ret = dwt_starttx(DWT_START_TX_IMMEDIATE | DWT_RESPONSE_EXPECTED);
@@ -294,7 +257,6 @@ void computeDistanceResp() {
             }
         }
         /* Check that the frame is a final message sent by "DS TWR initiator" example. */
-       	//else if (memcmp(rx_buffer, rx_final_msg, ALL_MSG_COMMON_LEN) == 0) {
         else if (validate_frame(rx_buffer, MSG_TYPE_FINAL) == 0) {
             uint32 poll_tx_ts, resp_rx_ts, final_tx_ts;
             uint32 poll_rx_ts_32, resp_tx_ts_32, final_rx_ts_32;
@@ -325,18 +287,6 @@ void computeDistanceResp() {
 
             printf("%3.2f\n", distance);
             return;
-
-            dist_buf[dist_buf_idx++] = distance;
-            if (dist_buf_idx == 10) {
-                // Compute average and print distance
-                float dist_sum = 0.f;
-                for (int i = 0; i < 10; i++) {
-                    dist_sum += dist_buf[i];
-                }
-                printf("%3.2f\n", dist_sum / 10.0);
-
-                dist_buf_idx = 0;
-            }
         }
         else if (validate_frame(rx_buffer, MSG_TYPE_SWITCH) == 0) {
             // Switch to master mode
@@ -382,15 +332,9 @@ void switchMaster() {
     is_master = false;
 }
 
-/*! ------------------------------------------------------------------------------------------------------------------
- * @fn main()
- *
- * @brief Application entry point.
- *
- * @param  none
- *
- * @return none
- */
+/**
+ * Application entry point.
+ * */
 int main(int argc, char *argv[]) {
 	/* Read command line arguments */
 	if (argc != 5) {
@@ -477,15 +421,9 @@ int main(int argc, char *argv[]) {
     }
 }
 
-/*! ------------------------------------------------------------------------------------------------------------------
- * @fn get_tx_timestamp_u64()
- *
- * @brief Get the TX time-stamp in a 64-bit variable.
- *        /!\ This function assumes that length of time-stamps is 40 bits, for both TX and RX!
- *
- * @param  none
- *
- * @return  64-bit value of the read time-stamp.
+/**
+ * Get the TX timestamp in a 64-bit variable.
+ * This function assumes that the length of timestamps is 40 bits, for both TX and RX
  */
 static uint64 get_tx_timestamp_u64(void) {
     uint8 ts_tab[5];
@@ -499,15 +437,9 @@ static uint64 get_tx_timestamp_u64(void) {
     return ts;
 }
 
-/*! ------------------------------------------------------------------------------------------------------------------
- * @fn get_rx_timestamp_u64()
- *
- * @brief Get the RX time-stamp in a 64-bit variable.
- *        /!\ This function assumes that length of time-stamps is 40 bits, for both TX and RX!
- *
- * @param  none
- *
- * @return  64-bit value of the read time-stamp.
+/**
+ * Get the RX timestamp in a 64-bit variable.
+ * This function assumes that length of timestamps is 40 bits, for both TX and RX
  */
 static uint64 get_rx_timestamp_u64(void) {
     uint8 ts_tab[5];
@@ -521,16 +453,9 @@ static uint64 get_rx_timestamp_u64(void) {
     return ts;
 }
 
-/*! ------------------------------------------------------------------------------------------------------------------
- * @fn final_msg_set_ts()
- *
- * @brief Fill a given timestamp field in the final message with the given value. In the timestamp fields of the final
- *        message, the least significant byte is at the lower address.
- *
- * @param  ts_field  pointer on the first byte of the timestamp field to fill
- *         ts  timestamp value
- *
- * @return none
+/**
+ * Fill a given timestamp field in the final message with the given value. In the timestamp fields of the final message,
+ * the least significant byte is at the lower address.
  */
 static void final_msg_set_ts(uint8 *ts_field, uint64 ts) {
     int i;
@@ -540,16 +465,9 @@ static void final_msg_set_ts(uint8 *ts_field, uint64 ts) {
     }
 }
 
-/*! ------------------------------------------------------------------------------------------------------------------
- * @fn final_msg_get_ts()
- *
- * @brief Read a given timestamp value from the final message. In the timestamp fields of the final message, the least
- *        significant byte is at the lower address.
- *
- * @param  ts_field  pointer on the first byte of the timestamp field to read
- *         ts  timestamp value
- *
- * @return none
+/**
+ * Fill a given timestamp field in the final message with the given value. In the timestamp fields of the final message,
+ * the least significant byte is at the lower address.
  */
 static void final_msg_get_ts(const uint8 *ts_field, uint32 *ts) {
     int i;
@@ -559,45 +477,48 @@ static void final_msg_get_ts(const uint8 *ts_field, uint32 *ts) {
     }
 }
 
+/**
+ * Update the addreses of each message when we change targets
+ */
 static void set_msg_addresses(uint8 master_addr, uint8 slave_addr) {
 	/* Poll message addresses */
-	tx_poll_msg[MSG_SRC_ADDR] = master_addr;
-	tx_poll_msg[MSG_SRC_ADDR+1] = master_addr;
-	tx_poll_msg[MSG_DEST_ADDR] = slave_addr;
-	tx_poll_msg[MSG_DEST_ADDR+1] = slave_addr;
+	tx_poll_msg[MSG_SRC_ADDR_IDX] = master_addr;
+	tx_poll_msg[MSG_SRC_ADDR_IDX+1] = master_addr;
+	tx_poll_msg[MSG_DEST_ADDR_IDX] = slave_addr;
+	tx_poll_msg[MSG_DEST_ADDR_IDX+1] = slave_addr;
 
-	rx_poll_msg[MSG_SRC_ADDR] = master_addr;
-	rx_poll_msg[MSG_SRC_ADDR+1] = master_addr;
-	rx_poll_msg[MSG_DEST_ADDR] = slave_addr;
-	rx_poll_msg[MSG_DEST_ADDR+1] = slave_addr;
+	rx_poll_msg[MSG_SRC_ADDR_IDX] = master_addr;
+	rx_poll_msg[MSG_SRC_ADDR_IDX+1] = master_addr;
+	rx_poll_msg[MSG_DEST_ADDR_IDX] = slave_addr;
+	rx_poll_msg[MSG_DEST_ADDR_IDX+1] = slave_addr;
 
 	/* Response message addresses */
-	tx_resp_msg[MSG_SRC_ADDR] = slave_addr;
-	tx_resp_msg[MSG_SRC_ADDR+1] = slave_addr;
-	tx_resp_msg[MSG_DEST_ADDR] = master_addr;
-	tx_resp_msg[MSG_DEST_ADDR+1] = master_addr;
+	tx_resp_msg[MSG_SRC_ADDR_IDX] = slave_addr;
+	tx_resp_msg[MSG_SRC_ADDR_IDX+1] = slave_addr;
+	tx_resp_msg[MSG_DEST_ADDR_IDX] = master_addr;
+	tx_resp_msg[MSG_DEST_ADDR_IDX+1] = master_addr;
 
-	rx_resp_msg[MSG_SRC_ADDR] = slave_addr;
-	rx_resp_msg[MSG_SRC_ADDR+1] = slave_addr;
-	rx_resp_msg[MSG_DEST_ADDR] = master_addr;
-	rx_resp_msg[MSG_DEST_ADDR+1] = master_addr;
+	rx_resp_msg[MSG_SRC_ADDR_IDX] = slave_addr;
+	rx_resp_msg[MSG_SRC_ADDR_IDX+1] = slave_addr;
+	rx_resp_msg[MSG_DEST_ADDR_IDX] = master_addr;
+	rx_resp_msg[MSG_DEST_ADDR_IDX+1] = master_addr;
 
 	/* Final message addresses */
-	tx_final_msg[MSG_SRC_ADDR] = master_addr;
-	tx_final_msg[MSG_SRC_ADDR+1] = master_addr;
-	tx_final_msg[MSG_DEST_ADDR] = slave_addr;
-	tx_final_msg[MSG_DEST_ADDR+1] = slave_addr;
+	tx_final_msg[MSG_SRC_ADDR_IDX] = master_addr;
+	tx_final_msg[MSG_SRC_ADDR_IDX+1] = master_addr;
+	tx_final_msg[MSG_DEST_ADDR_IDX] = slave_addr;
+	tx_final_msg[MSG_DEST_ADDR_IDX+1] = slave_addr;
 
-	rx_final_msg[MSG_SRC_ADDR] = master_addr;
-	rx_final_msg[MSG_SRC_ADDR+1] = master_addr;
-	rx_final_msg[MSG_DEST_ADDR] = slave_addr;
-	rx_final_msg[MSG_DEST_ADDR+1] = slave_addr;
+	rx_final_msg[MSG_SRC_ADDR_IDX] = master_addr;
+	rx_final_msg[MSG_SRC_ADDR_IDX+1] = master_addr;
+	rx_final_msg[MSG_DEST_ADDR_IDX] = slave_addr;
+	rx_final_msg[MSG_DEST_ADDR_IDX+1] = slave_addr;
 
     /* Switch message addresses */
-    switch_msg[MSG_SRC_ADDR] = master_addr;
-    switch_msg[MSG_SRC_ADDR+1] = master_addr;
-    switch_msg[MSG_DEST_ADDR] = slave_addr;
-    switch_msg[MSG_DEST_ADDR+1] = slave_addr;
+    switch_msg[MSG_SRC_ADDR_IDX] = master_addr;
+    switch_msg[MSG_SRC_ADDR_IDX+1] = master_addr;
+    switch_msg[MSG_DEST_ADDR_IDX] = slave_addr;
+    switch_msg[MSG_DEST_ADDR_IDX+1] = slave_addr;
 }
 
 /**
@@ -609,15 +530,15 @@ static int validate_frame(uint8* frame, uint8 expected_type) {
 		return -1;
 	}
 	/* Validate PAN ID */
-	if ((frame[3] != 0xCA) || (frame[4] != 0xDE)) {
+	if ((frame[2] != 0xCA) || (frame[3] != 0xDE)) {
 		return -1;
 	}
 	/* Validate that message is intended for this device */
-	if ((frame[5] != device_addr) || (frame[6] != device_addr)) {
+	if ((frame[MSG_DEST_ADDR_IDX] != device_addr) || (frame[MSG_DEST_ADDR_IDX+1] != device_addr)) {
 		return -1;
 	}
 	/* Validate that the message is of the expected type */
-	if (frame[9] != expected_type) {
+	if (frame[MSG_TYPE_IDX] != expected_type) {
 		return -1;
 	}
 	return 0;
