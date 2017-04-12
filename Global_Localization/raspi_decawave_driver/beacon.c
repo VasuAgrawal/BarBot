@@ -100,9 +100,9 @@ static uint32 status_reg = 0;
 #define POLL_TX_TO_RESP_RX_DLY_UUS 150
 /* This is the delay from Frame RX timestamp to TX reply timestamp used for calculating/setting the DW1000's delayed TX function. This includes the
  * frame length of approximately 2.66 ms with above configuration. */
-#define RESP_RX_TO_FINAL_TX_DLY_UUS 3100
+#define RESP_RX_TO_FINAL_TX_DLY_UUS 5000
 /* Receive response timeout. See NOTE 5 below. */
-#define RESP_RX_TIMEOUT_UUS 5400
+#define RESP_RX_TIMEOUT_UUS 10800
 
 /* Time-stamps of frames transmission/reception, expressed in device time units.
  * As they are 40-bit wide, we need to define a 64-bit int type to handle them. */
@@ -305,15 +305,19 @@ void computeDistanceResp() {
             distance = tof * SPEED_OF_LIGHT;
 
             /* Transmit distance to server */
+            DwDistance distProto = DwDistance_init_default;
+            uint8_t buffer[DwDistance_size];
+            pb_ostream_t stream = pb_ostream_from_buffer(buffer, sizeof(buffer));
+
             /* Fill out fields in proto */
-            distanceProto.dist = distance;
-            distanceProto.send_id = rx_buffer[MSG_SRC_ADDR_IDX];
-            distanceProto.recv_id = rx_buffer[MSG_DEST_ADDR_IDX];
-            distanceProto.beacon = true;
+            distProto.dist = distance;
+            distProto.send_id = rx_buffer[MSG_SRC_ADDR_IDX];
+            distProto.recv_id = rx_buffer[MSG_DEST_ADDR_IDX];
+            distProto.beacon = true;
 
             /* Serialize proto and encode size into header for sending to server */
-            pb_encode(&protoStream, DwDistance_fields, &distanceProto);
-            uint32_t byte_size = protoStream.bytes_written;
+            pb_encode(&stream, DwDistance_fields, &distProto);
+            uint32_t byte_size = stream.bytes_written;
             printf("Serialized size: %d\n", byte_size);
 
             uint8_t *bytes = new uint8_t[4 + byte_size];
@@ -325,10 +329,8 @@ void computeDistanceResp() {
             bytes[3] = (byte_size >> 24) & 0xFF;
 
             for (int i = 0; i < byte_size; i++) {
-                bytes[i+4] = protoBuffer[i];
-                std::cout << std::to_string((int)bytes[i]) << ", ";
+                bytes[i+4] = buffer[i];
             }
-            std::cout << std::endl;
 
             /* Attempt to send the array over the socket */
             if (write(serverfd, bytes, 4 + byte_size) < 0) {
@@ -488,7 +490,7 @@ int main(int argc, char *argv[]) {
     protoStream = pb_ostream_from_buffer(protoBuffer, sizeof(protoBuffer));
 
     /* Connect to server */
-    std::string addr = "localhost";
+    std::string addr = "192.168.0.109";
     std::string port = "8888";
     if ((serverfd = connect_to_server(addr, port)) < 0) {
         std::cout << "Unable to connect to server at " << addr << ":" << port << std::endl;
