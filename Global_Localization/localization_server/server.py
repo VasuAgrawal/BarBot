@@ -1,3 +1,5 @@
+#!/usr/bin/env python3
+
 import time
 import logging
 import queue
@@ -16,8 +18,11 @@ import tornado.iostream
 import tornado.tcpserver
 import numpy as np
 
+import scipy
+import scipy.optimize
 from scipy.spatial.distance import pdist as scipy_pdist
 from scipy.spatial.distance import squareform
+
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
 
@@ -34,6 +39,9 @@ is_beacon = dict()
 
 beacon_pos_guess = dict()
 beacon_pos_lock = threading.Lock()
+
+wristband_pos_guess = dict()
+wristband_pos_lock = threading.Lock()
 
 
 # This class is simple enough. All it does is spawn a Tornado TCP server to
@@ -182,7 +190,8 @@ class DataAggregator(object):
 class Visualizer(object):
     def __init__(self):
         self._pdist_measured = []
-        self._beacon_pos_guess = []
+        self._beacon_pos_guess = dict()
+        self._wristband_pos_guess = dict()
 
 
     def format_measured(self):
@@ -224,24 +233,38 @@ class Visualizer(object):
         sorted_keys = sorted(self._beacon_pos_guess.keys())  
         logging.debug("Sorted keys: %s", sorted_keys)
 
-        xs = []
-        ys = []
-        zs = []
+        beacon_xs = []
+        beacon_ys = []
+        beacon_zs = []
         for key in sorted_keys:
             point = self._beacon_pos_guess[key]
-            xs.append(point[0])
-            ys.append(point[1])
-            zs.append(point[2])
+            beacon_xs.append(point[0])
+            beacon_ys.append(point[1])
+            beacon_zs.append(point[2])
 
-        if xs and ys and zs:
-            ax.plot(xs, ys, zs)
+        if beacon_xs and beacon_ys and beacon_zs:
+            ax.plot(beacon_xs, beacon_ys, beacon_zs, marker='s', 
+                    c=[0.0, 1.0, 0.0, 1.0], alpha=1.0)
 
-            ax.set_xlim((min(xs), max(xs)))
-            ax.set_ylim((min(ys), max(ys)))
-            ax.set_zlim((min(zs), max(zs)))
+        wristband_xs = []
+        wristband_ys = []
+        wristband_zs = []
+        for key, point in self._wristband_pos_guess.items():
+            wristband_xs.append(point[0])
+            wristband_ys.append(point[1])
+            wristband_zs.append(point[2])
 
-            plt.show(False)
-            plt.pause(.001)
+        if wristband_xs and wristband_ys and wristband_zs:
+            ax.scatter(wristband_xs, wristband_ys, wristband_zs, marker='s',
+                    c=[1.0, 0.0, 0.0, 1.0], alpha=1.0)
+
+        ax.set_xlabel("X axis (m)")
+        ax.set_ylabel("Y axis (m)")
+        ax.set_zlabel("Z axis (m)")
+        plt.title("Calculated positions on server")
+
+        plt.show(False)
+        plt.pause(.001)
 
     
     def run(self):
@@ -257,6 +280,12 @@ class Visualizer(object):
             with beacon_pos_lock:
                 global beacon_pos_guess
                 self._beacon_pos_guess = copy.deepcopy(beacon_pos_guess)
+
+            global wristband_pos_lock
+            with wristband_pos_lock:
+                global wristband_pos_guess
+                self._wristband_pos_guess = copy.deepcopy(wristband_pos_guess)
+
 
             self.plot()
             logging.debug(self.format_measured())
@@ -277,6 +306,7 @@ class Solver(object):
         self._beacon_pdist = []
         self._num_beacons = 0
 
+        self._beacon_pos_stable = False
         self._beacon_stable_threshold = .1
         self._beacon_pos_guess = dict()
         self._guess_points = []
@@ -306,16 +336,6 @@ class Solver(object):
                 pprint.pformat(self._dwm_idx_mapping))
         logging.debug("Mapping from idx to DWM ID:\n%s",
                 pprint.pformat(self._dwm_idx_mapping_inv))
-
-        # Check to make sure that there are enough beacons to even attempt a
-        # solution. At minimum, 3 beacons and 1 wristband are needed to
-        # identify the position of the wristband, given beacon positions.
-        MIN_BEACONS = 4
-        if len(self._dwm_idx_mapping) < MIN_BEACONS:
-            logging.warning("Not enough DWM modules to attempt a solution!"
-                    " Expected to see %d, saw %d", MIN_BEACONS,
-                    len(self._dwm_idx_mapping))
-
 
         # Check to make sure that there are enough beacons to even attempt a
         # solution. At minimum, 3 beacons and 1 wristband are needed to
@@ -367,7 +387,7 @@ class Solver(object):
 
         # Each beacon needs to be connected to at least MIN_VALID number of
         # beacons, or else we won't be able to come to an accurate solution.
-        MIN_VALID = 3
+        MIN_VALID = 5
         valid = True
         for i, valid_count in enumerate(num_valid_in_row):
             if valid_count < MIN_VALID:
@@ -482,14 +502,16 @@ class Solver(object):
             self._guess_points, best_loss = self.GD(self._beacon_pdist,
                     self._guess_points)
 
-        logging.info("Beacon positions calculated with loss %f:\n%s", 
-                best_loss, self._guess_points)
 
+        # Check to see whether the position of the beacons is considered stable.
+        # If it is, then we'll want to continue with the solve of the wristband
+        # positions, not otherwise.
         if best_loss <= self._beacon_stable_threshold:
-            logging.info("Beacon points are stable!")
+            logging.info("Beacon positions are stable, loss %f", best_loss)
             self._beacon_pos_stable = True
         else:
-            logging.info("Beacon points are NOT stable, still improving.")
+            logging.info("Beacon positions are NOT stable, still improving"
+                    " with loss %f", best_loss)
             self._beacon_pos_stable = False
 
 
@@ -507,6 +529,53 @@ class Solver(object):
             global beacon_pos_guess
             global beacon_pos_stable
             beacon_pos_guess = self._beacon_pos_guess
+        
+        # Return code to indicate whether solution is successful
+        return self._beacon_pos_stable
+
+
+    def _wristband_loss(self, pos, wristband_idx):
+        # Get the list of distances between this wristband and other things.
+        pdist = self._pdist_measured[wristband_idx]
+
+        errors = []
+        for beacon_idx in self._beacon_idx:
+            beacon_dist = pdist[beacon_idx]
+            dwm_id = self._dwm_idx_mapping_inv[beacon_idx]
+            beacon_pos = self._beacon_pos_guess[dwm_id]
+            loss = self._norm(beacon_pos - pos) - beacon_dist
+            errors.append(loss)
+
+        logging.debug("Wristband loss for id %d: %s", wristband_idx, errors)
+        return np.array(errors, dtype=np.double)
+        
+
+    def _solve_wristbands(self):
+        # We can solve for each wristband using a similar, iterative gradient
+        # descent approach. We can solve for each wristband separately since we
+        # won't have distances between wristbands.
+
+        pos_guess = dict()
+
+        for wristband_idx in self._wristband_idx:
+            logging.info("Solving for wb id: %d", wristband_idx)
+        
+            # Pick some reasonable starting point. For now, we'll just use
+            pos = np.zeros(3, dtype=np.double)
+
+            # Attempt to solve for position by using scipy optimization
+            new_pos = scipy.optimize.leastsq(self._wristband_loss, pos, 
+                    (wristband_idx,))[0]
+            
+            dwm_id = self._dwm_idx_mapping_inv[wristband_idx]
+            pos_guess[dwm_id] = new_pos
+            # logging.info("Position for dwm id %d: %s", dwm_id, new_pos)
+
+        global wristband_pos_lock
+        with wristband_pos_lock:
+            global wristband_pos_guess
+            wristband_pos_guess.update(pos_guess)
+            print(wristband_pos_guess)
 
 
     def solve(self):
@@ -521,7 +590,12 @@ class Solver(object):
                 continue
 
             start_time = time.time()
-            self._solve_beacons()
+            if self._solve_beacons():
+                self._solve_wristbands()
+            else:
+                logging.warning("Beacon positions not stable, not solving for"
+                        " wristbands yet!")
+
             time.sleep(max(0, 1 - (time.time() - start_time)))
                 
 
