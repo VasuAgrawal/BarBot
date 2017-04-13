@@ -13,40 +13,47 @@ import tornado.web
 import tornado.websocket
 import tornado.httpserver
 
+import threading
+
+
 # TODO: Search through serial ports, open up the first one.
 try:
     ser = serial.Serial('/dev/ttyUSB0', 115200)
 except Exception:
     ser = None
-
-def map_value(x, from_lo, from_hi, to_lo, to_hi):
-    from_range = from_hi - from_lo
-    to_range = to_hi - to_lo
-    return (((x - from_lo) / from_range) * to_range) + to_lo
- 
-class RootHandler(tornado.web.RequestHandler):
-    def get(self):
-        self.render("static/html/index.html")
+# ser = None
 
 ALIVE = False
 alive_time = time.time()
 last_write_time = time.time()
 
-def watchdog():
-    logging.debug("Watchdog time difference: %f", time.time() - alive_time)
-    ALIVE = (time.time() - alive_time) < 1
-    if not ALIVE:
-        outputs = np.array([0.0, 0.0, 0.0, 0.0])
-        outputs = map_value(outputs, -1, 1, 1300, 1700)
-        logging.debug("Mapped outputs: %s", outputs)
-        out = ','.join(map(lambda x: str(int(x)), outputs)) + '\n'
+out_message_lock = threading.Lock()
+out_message = "1500 1500\n"
 
-        # Send a stop message
-        if (ser):
-            ser.write(out.encode('ascii'))
-            logging.info("WATCHDOG, Writing string " + repr(out))
-        else:
-            logging.info("WATCHDOG, Writing string " + repr(out))
+
+def map_value(x, from_lo, from_hi, to_lo, to_hi):
+    from_range = from_hi - from_lo
+    to_range = to_hi - to_lo
+    return (((x - from_lo) / from_range) * to_range) + to_lo
+
+
+def writer():
+    while True:
+        start = time.time()
+        with out_message_lock:
+            logging.debug("Should be writing %s", repr(out_message))
+            if (ser):
+                logging.info("Finally writing %s", repr(out_message))
+                ser.write(out_message.encode('ascii'))
+            else:
+                logging.warning("Not connected to serial port?")
+
+        time.sleep(max(0, .2 - (time.time() - start)))
+
+
+class RootHandler(tornado.web.RequestHandler):
+    def get(self):
+        self.render("static/html/index.html")
 
 
 class HeartbeatHandler(tornado.websocket.WebSocketHandler):
@@ -101,13 +108,17 @@ class GamepadHandler(tornado.websocket.WebSocketHandler):
 
         logging.debug("Mapped outputs: %s", outputs)
         out = ','.join(map(lambda x: str(int(x)), outputs)) + '\n'
-        logging.info("Writing string " + repr(out))
+        logging.info("Copying string " + repr(out))
 
-        global last_write_time
-        if (ser):
-            if (time.time() - last_write_time > .2):
-                ser.write(out.encode('ascii'))
-                last_write_time = time.time()
+        with out_message_lock:
+            global out_message
+            out_message = out
+
+        # global last_write_time
+        # if (ser):
+            # if (time.time() - last_write_time > .2):
+                # ser.write(out.encode('ascii'))
+                # last_write_time = time.time()
                 # logging.info("Writing string " + repr(out))
                 # logging.info("Read back " + repr(ser.readline()))
 
@@ -115,9 +126,16 @@ class GamepadHandler(tornado.websocket.WebSocketHandler):
     def open(self):
         logging.info("Opened websocket connection!")
 
+    @tornado.gen.coroutine
     def on_close(self):
         logging.info("Closed websocket connection :(")
-        ser.write("1500 1500\n".encode('ascii'))
+        # if (ser):
+            # ser.write("1500 1500\n".encode('ascii'))
+        
+        with out_message_lock:
+            global message
+            out_message = "1500 1500\n"
+
 
 
 class JoystickServer(tornado.httpserver.HTTPServer):
@@ -144,7 +162,8 @@ class JoystickServer(tornado.httpserver.HTTPServer):
 
 
 if __name__ == "__main__":
-    logging.getLogger().setLevel(logging.INFO)
+    threading.Thread(target=writer).start()
+    logging.getLogger().setLevel(logging.DEBUG)
     JoystickServer().listen(8000)
-    tornado.ioloop.PeriodicCallback(watchdog, 1000).start() # Call watchdog every 1 sec
+    # tornado.ioloop.PeriodicCallback(writer, 200).start() # Call watchdog every 1 sec
     tornado.ioloop.IOLoop.current().start()

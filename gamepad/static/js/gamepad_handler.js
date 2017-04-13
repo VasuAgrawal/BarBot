@@ -7,12 +7,12 @@ function start_ws() {
 
     ws.onopen = function() {
         console.log("Successfully connected to the server at " + location.host);
-        requestAnimationFrame(gamepadHandler);
+        requestAnimationFrame(gamepadHandlerConstant);
     }
 
     ws.onclose = function() {
         console.log("Closed connection to the server at " + location.host);
-        cancelRequestAnimationFrame(gamepadHandler);
+        cancelRequestAnimationFrame(gamepadHandlerConstant);
     }
 
     ws.onmessage = function(e) {
@@ -28,6 +28,33 @@ function start_ws() {
             heartbeat_ws.send("Don't kill me pl0x");
         }, 500);
     }
+}
+
+function gamepadHandlerConstant() {
+    for (var i = 0, len = navigator.getGamepads().length; i < len; i++) {
+        var gamepad = navigator.getGamepads()[i];
+
+        if (gamepad && gamepad.connected) {
+
+            var state = {
+                "index" : gamepad.index,
+                "timestamp" : gamepad.timestamp,
+                "axes" : gamepad.axes.map(function(elem) {
+                    return Math.round(elem * 1000) / 1000;
+                }),
+                "buttons" : gamepad.buttons.map(function(elem) {
+                    return elem.pressed ? 1.0 : 0.0;
+                }),
+                
+            }
+
+            var text = JSON.stringify(state);
+            doc_elem.innerHTML = text;
+            ws.send(JSON.stringify(state));
+        }
+    }
+
+    requestAnimationFrame(gamepadHandler);
 }
 
 function gamepadHandler() {
