@@ -233,18 +233,29 @@ class Visualizer(object):
         sorted_keys = sorted(self._beacon_pos_guess.keys())  
         logging.debug("Sorted keys: %s", sorted_keys)
 
+        colors = [[1.0, 0.0, 0.0, 1.0], # Red
+                  [0.0, 1.0, 0.0, 1.0], # Green
+                  [0.0, 0.0, 1.0, 1.0], # Blue
+                  [1.0, 1.0, 0.0, 1.0], # Yellow
+                  [0.0, 1.0, 1.0, 1.0], # Cyan
+                  [1.0, 0.0, 1.0, 1.0], # Magenta
+                  [0.0, 0.0, 0.0, 1.0]] # Black
+
         beacon_xs = []
         beacon_ys = []
         beacon_zs = []
+        i = 0
         for key in sorted_keys:
             point = self._beacon_pos_guess[key]
             beacon_xs.append(point[0])
             beacon_ys.append(point[1])
             beacon_zs.append(point[2])
+            ax.plot([point[0]], [point[1]], [point[2]], marker='s', c=colors[i], alpha=1.0)
+            i += 1
 
-        if beacon_xs and beacon_ys and beacon_zs:
-            ax.plot(beacon_xs, beacon_ys, beacon_zs, marker='s', 
-                    c=[0.0, 1.0, 0.0, 1.0], alpha=1.0)
+        #if beacon_xs and beacon_ys and beacon_zs:
+        #    ax.plot(beacon_xs, beacon_ys, beacon_zs, marker='s', 
+        #            c=[0.0, 1.0, 0.0, 1.0], alpha=1.0)
 
         wristband_xs = []
         wristband_ys = []
@@ -387,7 +398,7 @@ class Solver(object):
 
         # Each beacon needs to be connected to at least MIN_VALID number of
         # beacons, or else we won't be able to come to an accurate solution.
-        MIN_VALID = 5
+        MIN_VALID = 6
         valid = True
         for i, valid_count in enumerate(num_valid_in_row):
             if valid_count < MIN_VALID:
@@ -600,7 +611,7 @@ class Solver(object):
                 
 
 def main():
-    logging.root.setLevel(logging.INFO)
+    logging.root.setLevel(logging.DEBUG)
 
     # All of these could totally be their own separate ROS nodes ...
     server = DataRecvServer()
