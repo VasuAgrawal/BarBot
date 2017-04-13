@@ -30,7 +30,6 @@ class RootHandler(tornado.web.RequestHandler):
 
 ALIVE = False
 alive_time = time.time()
-
 last_write_time = time.time()
 
 def watchdog():
@@ -104,6 +103,7 @@ class GamepadHandler(tornado.websocket.WebSocketHandler):
         out = ','.join(map(lambda x: str(int(x)), outputs)) + '\n'
         logging.info("Writing string " + repr(out))
 
+        global last_write_time
         if (ser):
             if (time.time() - last_write_time > .2):
                 ser.write(out.encode('ascii'))
