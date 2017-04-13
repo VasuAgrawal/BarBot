@@ -133,6 +133,10 @@ static int serverfd;
 static std::string serverip = "192.168.1.109";
 static std::string serverport = "8888";
 
+// Distance regression information
+#define X_COEFF 0.962467985748344
+#define Y_INTERCEPT 0.0252350208688039
+
 // Declaration of static functions.
 static uint64 get_tx_timestamp_u64(void);
 static uint64 get_rx_timestamp_u64(void);
@@ -300,6 +304,9 @@ void computeDistanceResp() {
             tof = tof_dtu * DWT_TIME_UNITS;
             distance = tof * SPEED_OF_LIGHT;
 
+            // Apply regression
+            distance = X_COEFF*distance + Y_INTERCEPT;
+
             // Transmit distance to server
             DwDistance distProto = DwDistance_init_default;
             uint8_t buffer[DwDistance_size];
@@ -339,7 +346,7 @@ void computeDistanceResp() {
         else if (validate_frame(rx_buffer, MSG_TYPE_SWITCH) == 0) {
             // Switch to master mode
             is_master = true;
-            deca_sleep(1000);
+            deca_sleep(100);
         }
     }
     else {
@@ -514,10 +521,10 @@ int main(int argc, char *argv[]) {
     				deca_sleep(RNG_DELAY_MS);
     			}
 
-                deca_sleep(1000);
+                deca_sleep(100);
     		}
 
-    		deca_sleep(1000);
+    		deca_sleep(100);
 
     		// Transmit Switch message to next master
     		switchMaster();

@@ -19,7 +19,7 @@
 #include <string.h>
 
 /* Number of measurements to read before terminating */
-#define NUM_MEASUREMENTS 2500
+#define NUM_MEASUREMENTS 100
 
 /* Default communication configuration. We use here EVK1000's default mode (mode 3). */
 static dwt_config_t config = {
@@ -296,7 +296,7 @@ int main(int argc, char *argv[]) {
             successCount++;
             printf("%3.5f\n", distance);
             if (successCount == NUM_MEASUREMENTS) {
-                //break;
+                break;
             }
         }
     }
