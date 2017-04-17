@@ -36,18 +36,18 @@
 #include <netdb.h>
 
 // Inter-ranging delay period, in milliseconds.
-#define RNG_DELAY_MS 10
+#define RNG_DELAY_MS 100
 
 // Default communication configuration. We use here EVK1000's default mode (mode 3).
 static dwt_config_t config = {
-    2,               // Channel number.
+    5,               // Channel number.
     DWT_PRF_64M,     // Pulse repetition frequency.
     DWT_PLEN_1024,   // Preamble length. Used in TX only.
     DWT_PAC32,       // Preamble acquisition chunk size. Used in RX only.
     9,               // TX preamble code. Used in TX only.
     9,               // RX preamble code. Used in RX only.
     1,               // 0 to use standard SFD, 1 to use non-standard SFD.
-    DWT_BR_110K,     // Data rate.
+    DWT_BR_850K,     // Data rate.
     DWT_PHRMODE_STD, // PHY header mode.
     (1025 + 64 - 32) // SFD timeout (preamble length + 1 + SFD length - PAC size). Used in RX only.
 };
@@ -97,7 +97,7 @@ static uint32 status_reg = 0;
 #define POLL_TX_TO_RESP_RX_DLY_UUS 150
 // This is the delay from Frame RX timestamp to TX reply timestamp used for calculating/setting the DW1000's delayed TX function. This includes the
 // frame length of approximately 2.66 ms with above configuration.
-#define RESP_RX_TO_FINAL_TX_DLY_UUS 5000
+#define RESP_RX_TO_FINAL_TX_DLY_UUS 7000
 // Receive response timeout.
 #define RESP_RX_TIMEOUT_UUS 10800
 
@@ -180,6 +180,7 @@ int computeDistanceInit() {
 
         // Validate the requested type of frame to process appropriately.
         if (validate_frame(rx_buffer, MSG_TYPE_RESP) == 0) {
+            //printf("Rx ack\n");
             uint32 final_tx_time;
             int ret;
 
@@ -209,12 +210,18 @@ int computeDistanceInit() {
                 // Poll DW1000 until TX frame sent event set.
                 while (!(dwt_read32bitreg(SYS_STATUS_ID) & SYS_STATUS_TXFRS));
 
+                //printf("Sent final\n");
+
                 // Clear TXFRS event.
                 dwt_write32bitreg(SYS_STATUS_ID, SYS_STATUS_TXFRS);
+            }
+            else {
+                //printf("Delayed tx fail on final\n");
             }
         }
     }
     else {
+        //printf("timeout\n");
         // Clear RX error/timeout events in the DW1000 status register.
         dwt_write32bitreg(SYS_STATUS_ID, SYS_STATUS_ALL_RX_TO | SYS_STATUS_ALL_RX_ERR);
 
@@ -242,6 +249,7 @@ void computeDistanceResp() {
     while (!((status_reg = dwt_read32bitreg(SYS_STATUS_ID)) & (SYS_STATUS_RXFCG | SYS_STATUS_ALL_RX_TO | SYS_STATUS_ALL_RX_ERR)));
 
     if (status_reg & SYS_STATUS_RXFCG) {
+        //printf("Rx\n");
         was_previous_master = false; // Can assume that if we received a frame, master has been successfully passed on
 
         uint32 frame_len;
@@ -257,6 +265,7 @@ void computeDistanceResp() {
 
         // Validate the requested type of frame to process appropriately.
         if (validate_frame(rx_buffer, MSG_TYPE_POLL) == 0) {
+            //printf("Rx init\n");
             int ret;
 
             // Retrieve poll reception timestamp.
@@ -267,7 +276,7 @@ void computeDistanceResp() {
             tx_resp_msg[MSG_DEST_ADDR_IDX+1] = rx_buffer[MSG_SRC_ADDR_IDX];
             dwt_writetxdata(sizeof(tx_resp_msg), tx_resp_msg, 0); // Zero offset in TX buffer.
             dwt_writetxfctrl(sizeof(tx_resp_msg), 0, 1); // Zero offset in TX buffer, ranging.
-            ret = dwt_starttx(DWT_START_TX_IMMEDIATE | DWT_RESPONSE_EXPECTED);
+            ret = dwt_starttx(DWT_START_TX_IMMEDIATE);
 
             // If dwt_starttx() returns an error, abandon this ranging exchange and proceed to the next one.
             if (ret == DWT_ERROR) {
@@ -277,6 +286,7 @@ void computeDistanceResp() {
         }
         // Check that the frame is a final message sent by "DS TWR initiator" example.
         else if (validate_frame(rx_buffer, MSG_TYPE_FINAL) == 0) {
+            //printf("Rx final\n");
             uint32 poll_tx_ts, resp_rx_ts, final_tx_ts;
             uint32 poll_rx_ts_32, resp_tx_ts_32, final_rx_ts_32;
             double Ra, Rb, Da, Db;
@@ -344,12 +354,14 @@ void computeDistanceResp() {
             return;
         }
         else if (validate_frame(rx_buffer, MSG_TYPE_SWITCH) == 0) {
+            //printf("Rx switch\n");
             // Switch to master mode
             is_master = true;
             deca_sleep(100);
         }
     }
     else {
+        //printf("Error/timeout\n");
         // Clear RX error/timeout events in the DW1000 status register.
         dwt_write32bitreg(SYS_STATUS_ID, SYS_STATUS_ALL_RX_TO | SYS_STATUS_ALL_RX_ERR);
 
