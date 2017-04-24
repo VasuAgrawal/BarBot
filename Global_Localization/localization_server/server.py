@@ -318,7 +318,7 @@ class Solver(object):
         self._num_beacons = 0
 
         self._beacon_pos_stable = False
-        self._beacon_stable_threshold = .1
+        self._beacon_stable_threshold = .4
         self._beacon_pos_guess = dict()
         self._guess_points = []
   
@@ -611,7 +611,7 @@ class Solver(object):
                 
 
 def main():
-    logging.root.setLevel(logging.DEBUG)
+    logging.root.setLevel(logging.INFO)
 
     # All of these could totally be their own separate ROS nodes ...
     server = DataRecvServer()

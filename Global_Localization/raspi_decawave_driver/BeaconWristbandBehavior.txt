@@ -1,0 +1,34 @@
+-----------------------------
+Beacons - Initialization Mode
+-----------------------------
+Master:
+	- Transmit n messages to each beacon in order (ascending)
+	- Hand off master to next beacon in order (descending)
+
+Slave:
+	- Listen for messages (init, final, master switch, mode switch)
+	- On init, send response to beacon that transmitted this init
+	- On final, compute distance and send it to the server
+	- On master switch, enter into master mode
+	- On mode switch, enter into tracking mode
+
+-----------------------
+Beacons - Tracking Mode
+-----------------------
+All:
+	- Listen for messages (init, final)
+	- On init, send response to beacon that transmitted this init after delay corresponding to beacon index (TDMA)
+	- On final, compute distance and send it to the server
+
+--------------------------------
+Wristbands - Initialization Mode
+--------------------------------
+	- Listen for messages (mode switch)
+	- On mode switch, enter into tracking mode
+
+--------------------------
+Wristbands - Tracking Mode
+--------------------------
+	- Periodically send init messages
+	- Respond to multiple response messages (one from each beacon)
+	- Do wristband-level TDMA stuff here
