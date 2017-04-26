@@ -1,3 +1,5 @@
+#!/usr/bin/env python3
+
 from datetime import datetime
 import math
 from Order import Order
@@ -24,8 +26,8 @@ def initDb(data):
 def doADbThing(sql, args, fetch=False):
     con = psycopg2.connect(
         dbname="template1",
-        user="Kim",
-        password="icanswim",
+        user="postgres",
+        # password="icanswim",
         host="localhost",
         port=10601)
 

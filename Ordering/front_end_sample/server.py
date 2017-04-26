@@ -336,7 +336,7 @@ class BatBotApplication(tornado.web.Application):
         }
         tornado.web.Application.__init__(self, handlers, **settings)
 
-        dsn = 'dbname=template1 user=Kim password=icanswim' \
+        dsn = 'dbname=template1 user=postgres ' \
                   'host=localhost port=10601'
 
         self.db = momoko.Pool(dsn=dsn, size=2, ioloop=ioloop)
@@ -352,7 +352,7 @@ def main():
     ioloop.start()
     dbConnection.result()
 
-    app.listen(8888)
+    app.listen(8080)
     ioloop.start()
 
 if __name__ == "__main__":

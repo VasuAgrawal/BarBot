@@ -4,3 +4,4 @@ Global_Localization/raspi_decawave_driver/bin
 Controller/build/*
 Controller/devel/*
 __pycache__
+data
