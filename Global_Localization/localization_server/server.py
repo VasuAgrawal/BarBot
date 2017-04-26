@@ -9,6 +9,7 @@ import shutil
 import time
 import copy
 import math
+import socket
 
 import tornado
 import tornado.gen
@@ -28,6 +29,9 @@ from mpl_toolkits.mplot3d import Axes3D
 
 import packet
 from protos.dwdistance_pb2 import DwDistance
+from protos.positions_pb2 import Point
+from protos.positions_pb2 import Locations
+from protos.positions_pb2 import ConnectionRequest
 
 # Globals are probably bad right?
 messages = queue.Queue()
@@ -302,6 +306,76 @@ class Visualizer(object):
 
             self.plot()
             logging.debug(self.format_measured())
+            time.sleep(max(1 - (time.time() - start), 0))
+
+
+class Publisher(object):
+    def __init__(self, addr, port):
+        self._addr = addr
+        self._port = port
+        self._beacon_pos_guess = dict()
+        self._wristband_pos_guess = dict()
+        self._sock = None
+        self._connect()
+
+
+    def _connect(self):
+        try:
+            # Attempt to connect to the server
+            self._sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            self._sock.connect((self._addr, self._port))
+            request = ConnectionRequest()
+            # request.type = ConnectionRequest.ConnectionType.GLS
+            request.type = ConnectionRequest.GLS
+            data = packet.make_packet_from_bytes(request.SerializeToString())
+            self._sock.send(data)
+
+        except (ConnectionRefusedError, Exception):
+            logging.warning("Unable to connect to %s:%d", self._addr,
+                    self._port)
+            self._sock = None
+
+
+    def _send(self):
+        if self._sock is None:
+            return False
+
+        loc = Locations()
+        for key, point in {**self._beacon_pos_guess,
+                **self._wristband_pos_guess}.items():
+            loc.locations[key].x = point[0]
+            loc.locations[key].y = point[1]
+            loc.locations[key].z = point[2]
+
+        try:
+            data = packet.make_packet_from_bytes(loc.SerializeToString())
+            self._sock.send(data)
+        except Exception:
+            self._sock = None
+            return False
+
+        return True
+
+    
+    def run(self):
+        while True:
+            start = time.time()
+
+            global beacon_pos_lock
+            with beacon_pos_lock:
+                global beacon_pos_guess
+                self._beacon_pos_guess = copy.deepcopy(beacon_pos_guess)
+
+            global wristband_pos_lock
+            with wristband_pos_lock:
+                global wristband_pos_guess
+                self._wristband_pos_guess = copy.deepcopy(wristband_pos_guess)
+
+            if self._send():
+                logging.debug("Successfully published data to scheduler!")
+            else:
+                logging.warning("Unable to send data to scheduler!")
+
             time.sleep(max(1 - (time.time() - start), 0))
 
 
@@ -631,12 +705,18 @@ def main():
     visualizer_thread.start()
     logging.info("Starting visualizer thread!")
 
+    publisher = Publisher("localhost", 4242)
+    publisher_thread = threading.Thread(target=publisher.run)
+    publisher_thread.start()
+    logging.info("Starting publisher thread!")
+
     solver = Solver()
     solver_thread = threading.Thread(target=solver.solve)
     solver_thread.start()
     logging.info("Started solver thread")
 
     solver_thread.join()
+    publisher_thread.join()
     visualizer_thread.join()
     aggregator_thread.join()
     server_thread.join()

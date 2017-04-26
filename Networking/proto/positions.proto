@@ -1,0 +1,19 @@
+syntax = "proto3";
+
+message Point {
+    double x = 1;
+    double y = 2;
+    double z = 3;
+}
+
+message Locations {
+    map<uint32, Point> locations = 1;
+}
+
+message ConnectionRequest {
+    enum ConnectionType {
+        GLS = 0;
+        ROBOT = 1;
+    }
+    ConnectionType type = 1;
+}
