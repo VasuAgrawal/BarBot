@@ -2,11 +2,35 @@
 import socket
 import sys
 import rospy
+import time
+
 from barbot.msg import State, Waypoint, Thruster
+from positions_pb2 import Point
+from positions_pb2 import Locations
+from positions_pb2 import ConnectionRequest
+
+
+
+HEADER_LEN = 4 # Number of bytes for the header
+ENDIANNESS = "little"
+
+# Protobuf strings are serialized to bytes encoded in UTF8
+def make_packet_from_bytes(data_bytes):
+    # Just do a length encoding of the data bytes
+    try:
+        # Unsigned integer
+        header = len(data_bytes).to_bytes(HEADER_LEN, ENDIANNESS)
+    except OverflowError as e:
+        # The data is too long to fit, so we have to do something.
+        raise e
+
+    return header + data_bytes
+
+
 
 # The scheduler node is responsible for receiving ordering information, and sending over to our controller.
 class Scheduler(object):
-    def __init__(self, name, waypoint_topic):
+    def __init__(self, name, beacon, waypoint_topic):
         rospy.init_node(name)
         self.rate = rospy.Rate(30)
         self.pub = rospy.Publisher(waypoint_topic, Waypoint, queue_size=1)
@@ -17,42 +41,37 @@ class Scheduler(object):
     # This function should connect to the actual scheduler, and push to robot as required
     def listen(self, server_address):
         sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        print >> sys.stderr, 'starting up on %s port %s' % server_address
-        sock.bind(server_address)
-        sock.listen(1)
+        print >> sys.stderr, 'connecting to %s port %s' % server_address
+
+        sock.connect(server_address)
+        print "connected!"
+
+        request = ConnectionRequest()
+        request.type = ConnectionRequest.ROBOT
+        data = make_packet_from_bytes(request.SerializeToString())
+        self._sock.send(data)
+
+
         while True:
-            # Wait for a connection
-            print >>sys.stderr, 'waiting for a connection'
-            connection, client_address = sock.accept()
-            try:
-                print >>sys.stderr, 'connection from', client_address
+            header = sock.recv(HEADER_LEN)
+            num_to_read = int.from_bytes(header, ENDIANNESS)
+            data = sock.recv(num_to_read)
 
-                # Receive the data in small chunks and retransmit it
-                while True:
+            loc = Locations()
+            loc.ParseFromString(data)
 
-                    data = connection.recv(64)
-                    print >>sys.stderr, 'received "%s"' % data
+            if self.beacon in loc.locations:
+                point = loc.locations[self.beacon]
 
-                    locations = data.split(' ')
-                    if(len(locations) != 3):
-                        print("message ignored")
-                        continue
+                waypoint = Waypoint()
+                waypoint.pose.x = float(point.x)
+                waypoint.pose.y = float(point.y)
+                waypoint.pose.theta = float(point.z)
+                waypoint.header.stamp = rospy.Time.now()
 
-                    waypoint = Waypoint()
-                    waypoint.pose.x = float(locations[0])
-                    waypoint.pose.y = float(locations[1])
-                    waypoint.pose.theta = float(locations[2])
-                    waypoint.header.stamp = rospy.Time.now()
-
-                    self.push(waypoint)
-                        
-            finally:
-                # Clean up the connection
-                connection.close()
-
-
+                self.push(waypoint)
 
 if __name__ == '__main__':
-    scheduler = Scheduler("scheduler", "waypoint_topic")
+    scheduler = Scheduler("scheduler", 1, "waypoint_topic")
     server_address = ('localhost', 10000)
     scheduler.listen(server_address)
