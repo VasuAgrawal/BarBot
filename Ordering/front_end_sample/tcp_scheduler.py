@@ -28,6 +28,9 @@ class Scheduler(tornado.tcpserver.TCPServer):
             #TODO: replace this location with location from GLS
             self.robots.append(Robot(i, location=(0,0)))
 
+        self._real_robots = []
+        self._loc = Locations()
+
 
     @tornado.gen.coroutine
     def handle_gls(self, stream, address):
@@ -42,12 +45,14 @@ class Scheduler(tornado.tcpserver.TCPServer):
 
             loc = Locations()
             loc.ParseFromString(message_bytes)
-            logging.debug(loc)
+            logging.info("Received location data!")
+            self._loc = loc
          
 
     @tornado.gen.coroutine
     def handle_robot(self, stream, address):
         logging.info("Received ROBOT connection request!")
+        self._real_robots.append(stream)
 
 
     @tornado.gen.coroutine
@@ -71,40 +76,50 @@ class Scheduler(tornado.tcpserver.TCPServer):
             logging.error("Invalid connection request state?")
 
 
-    @tornado.gen.coroutine
-    def sendPost(self):
-        destination = 'http://localhost:8080/test/'
-        request = httpclient.HTTPRequest(destination, body='woo', method="POST")
-        response = yield self.http_client.fetch(request)
-        print(response)
+    def update_robots(self):
+        data = packet.make_packet_from_bytes(self._loc.SerializeToString())
 
-    #read orders from the database
-    def getAllOrders(self):
-        print("getting the orders")
-        order_sql = """
-            SELECT id, user_id, drink_id, completed, time, robot_id, priority
-            FROM orders
-            ORDER BY time
-        """
-        order_cursor = yield db.execute(order_sql)
-        newOrders = order_cursor.fetchall()
-
-        orders = []
-        for (id, userId, drinkId, completed, time, robotId, priority) in newOrders:
-            robot = None if robotId == -1 else self.robots[robotId]
-
-            #TODO: get wristbandID then location from GLS
-            orders.append(Order(id, userId, drinkId, completed=completed,
-                                time=time, robot=robot, priority=priority))
-        print("got all the orders")
-        return orders
+        for robot in self._real_robots[::-1]:
+            try:
+                robot.write(data)
+            except Exception:
+                self._real_robots.remove(robot)
 
 
-    #update the scheduler with stuff
-    def updateScheduler(self):
-        orders = list(self.getAllOrders())
+    # @tornado.gen.coroutine
+    # def sendPost(self):
+        # destination = 'http://localhost:8080/test/'
+        # request = httpclient.HTTPRequest(destination, body='woo', method="POST")
+        # response = yield self.http_client.fetch(request)
+        # print(response)
+
+    # #read orders from the database
+    # def getAllOrders(self):
+        # print("getting the orders")
+        # order_sql = """
+            # SELECT id, user_id, drink_id, completed, time, robot_id, priority
+            # FROM orders
+            # ORDER BY time
+        # """
+        # order_cursor = yield db.execute(order_sql)
+        # newOrders = order_cursor.fetchall()
+
+        # orders = []
+        # for (id, userId, drinkId, completed, time, robotId, priority) in newOrders:
+            # robot = None if robotId == -1 else self.robots[robotId]
+
+            # #TODO: get wristbandID then location from GLS
+            # orders.append(Order(id, userId, drinkId, completed=completed,
+                                # time=time, robot=robot, priority=priority))
+        # print("got all the orders")
+        # return orders
+
+
+    # #update the scheduler with stuff
+    # def updateScheduler(self):
+        # orders = list(self.getAllOrders())
         
-        print("orders!", orders)
+        # print("orders!", orders)
 
 
 if __name__ == "__main__":
@@ -113,17 +128,18 @@ if __name__ == "__main__":
     scheduler.listen(4242)
 
     ioloop = tornado.ioloop.IOLoop.instance()
-    #set up database
-    # dsn = 'dbname=template1 user=Kim password=icanswim ' \
-    dsn = 'dbname=template1 user=postgres '\
-                  'host=localhost port=10601'
-    db = momoko.Pool(dsn=dsn, size=2, ioloop=ioloop)
-    dbConnection = db.connect()
-    ioloop.add_future(dbConnection, lambda f: ioloop.stop())
-    ioloop.start()
-    dbConnection.result()
+    # #set up database
+    # # dsn = 'dbname=template1 user=Kim password=icanswim ' \
+    # dsn = 'dbname=template1 user=postgres '\
+                  # 'host=localhost port=10601'
+    # db = momoko.Pool(dsn=dsn, size=2, ioloop=ioloop)
+    # dbConnection = db.connect()
+    # ioloop.add_future(dbConnection, lambda f: ioloop.stop())
+    # ioloop.start()
+    # dbConnection.result()
 
     # ioloop.run_sync(scheduler.sendPost)
 
     # tornado.ioloop.PeriodicCallback(scheduler.updateScheduler, 1000).start()
+    tornado.ioloop.PeriodicCallback(scheduler.update_robots, 1000).start()
     ioloop.start()
