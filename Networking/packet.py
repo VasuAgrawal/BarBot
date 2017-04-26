@@ -1,3 +1,5 @@
+import sys
+
 HEADER_LEN = 4 # Number of bytes for the header
 ENDIANNESS = "little"
 
