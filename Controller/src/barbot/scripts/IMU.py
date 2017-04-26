@@ -77,4 +77,4 @@ class IMU(object):
         return Vector3(x, y, z)
 
 if __name__ == '__main__':
-    pass
+    imu = IMU("IMU", "/imu_topic")

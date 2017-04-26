@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 import rospy
-from barbot.msg import State, Waypoint, Thruster
-from geometry_msgs.msg import Pose2D
+from barbot.msg import State, Thruster, Euler
+from geometry_msgs.msg import Pose2D, PointStamped
 import math
 
 class Controller(object):
@@ -28,8 +28,8 @@ class Controller(object):
     def state_callback(self, data):
         self.state = data
         if (self.waypoint != None):
-            robot_waypoint_x = self.waypoint.pose.x - self.state.pose.x
-            robot_waypoint_y = self.waypoint.pose.y - self.state.pose.y
+            robot_waypoint_x = self.waypoint.point.x - self.state.point.x
+            robot_waypoint_y = self.waypoint.point.y - self.state.point.y
             robot_waypoint_t = math.atan2(robot_waypoint_y, robot_waypoint_x)
             error = ((robot_waypoint_t - self.state.pose.theta) + math.pi) % (2*math.pi) - math.pi
 
@@ -74,7 +74,7 @@ class Controller(object):
 
     # once a new waypoint comes in, overwrites the old one
     def waypoint_listener(self, topic):
-        rospy.Subscriber(topic, Waypoint, self.waypoint_callback)
+        rospy.Subscriber(topic, PointStamped, self.waypoint_callback)
 
     def waypoint_callback(self, data):
         self.waypoint = data
