@@ -79,12 +79,13 @@ class RegisterHandler(PostgresHandler):
         name = str(self.get_argument("Name"))
         email = str(self.get_argument("Email"))
         password = str(self.get_argument("Password"))
-        if(len(name) > 0 and len(email) > 0 and len(password) > 0):
+        wristbandID = str(self.get_argument("WristbandID"))
+        if(len(name) > 0 and len(email) > 0 and len(password) > 0 and len(wristbandID) > 0):
             sql = """
-                    INSERT INTO users(name, email, password)
-                    VALUES(%s, %s, %s)
+                    INSERT INTO users(name, email, password, wristbandID)
+                    VALUES(%s, %s, %s, %s)
                 """
-            cursor = yield self.db().execute(sql, (name, email,password,))
+            cursor = yield self.db().execute(sql, (name, email,password,wristbandID))
             self.redirect("/")
         else:
             self.write("Register Fail")
@@ -257,6 +258,11 @@ class SetUpHandler(PostgresHandler):
     @tornado.gen.coroutine
     def get(self):
         print("initializing")
+
+        user_sql = """
+                DROP TABLE users CASCADE
+        """
+        user_cursor = yield self.db().execute(user_sql)
         
         # USER TABLE INIT
         user_sql = """
@@ -265,7 +271,8 @@ class SetUpHandler(PostgresHandler):
                     id integer PRIMARY KEY DEFAULT nextval('user_id') ,
                     name  varchar(80) UNIQUE,
                     email  varchar(80) UNIQUE,
-                    password  varchar(80) 
+                    password  varchar(80),
+                    wristbandID integer
                 );
                 ALTER SEQUENCE user_id OWNED BY users.id;
             """
@@ -336,6 +343,7 @@ class BatBotApplication(tornado.web.Application):
         }
         tornado.web.Application.__init__(self, handlers, **settings)
 
+        #dsn = 'dbname=template1 user=Kim password=icanswim ' \
         dsn = 'dbname=template1 user=postgres ' \
                   'host=localhost port=10601'
 
