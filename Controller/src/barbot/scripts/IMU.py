@@ -50,7 +50,7 @@ class IMU(object):
         return msg
 
     def getQuaternion(self):
-        x, y, z, w = self.bno.read_quaterion()
+        x, y, z, w = self.bno.read_quaternion()
         return Quaternion(x, y, z, w)
 
     def getMagnetometer(self):
