@@ -52,7 +52,7 @@ add_message_files(
   FILES
   Thruster.msg
   State.msg
-  Waypoint.msg
+  Euler.msg
 )
 
 ## Generate services in the 'srv' folder

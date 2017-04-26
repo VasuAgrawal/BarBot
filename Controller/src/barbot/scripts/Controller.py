@@ -28,13 +28,13 @@ class Controller(object):
     def state_callback(self, data):
         self.state = data
         if (self.waypoint != None):
-            robot_waypoint_x = self.waypoint.point.x - self.state.point.x
-            robot_waypoint_y = self.waypoint.point.y - self.state.point.y
+            robot_waypoint_x = self.waypoint.point.x - self.state.pose.x
+            robot_waypoint_y = self.waypoint.point.y - self.state.pose.y
             robot_waypoint_t = math.atan2(robot_waypoint_y, robot_waypoint_x)
             error = ((robot_waypoint_t - self.state.pose.theta) + math.pi) % (2*math.pi) - math.pi
 
             # angle differs by a lot, turn the robot, this can just be hardcoded because PID fixes slight differences
-            if(abs(error) > theta_threshold):
+            if(abs(error) > self.theta_threshold):
                 msg = Thruster()
                 msg.header.stamp = rospy.Time.now()
                 msg.left = math.copysign(self.turn_speed, error)
