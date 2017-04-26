@@ -8,7 +8,7 @@ from barbot.msg import Euler
 
 # IMU serialize to ROS, will be used in observer
 class IMU(object):
-    def __init__(self, name):
+    def __init__(self, name, topic_name):
         # initialize the IMU
         self.bno = BNO055.BNO055(serial_port='/dev/ttyAMA0', rst=18)
         if not self.bno.begin():
@@ -21,13 +21,13 @@ class IMU(object):
         rospy.init_node(name)
         rate = rospy.Rate(10)
 
-        eulerPub = rospy.Publisher('Euler', Euler)
-        quatPub = rospy.Publisher('Quaternion', Quaternion)
-        magPub = rospy.Publisher('Magnetometer', Vector3)
-        gyroPub = rospy.Publisher('Gyroscope', Vector3)
-        accelPub = rospy.Publisher('Accelerometer', Vector3)
-        linearPub = rospy.Publisher('Linear Acceleration', Vector3)
-        gravityPub = rospy.Publisher('Gravity Acceleration', Vector3)
+        eulerPub = rospy.Publisher(topic_name+'/Euler', Euler)
+        quatPub = rospy.Publisher(topic_name+'/Quaternion', Quaternion)
+        magPub = rospy.Publisher(topic_name+'/Magnetometer', Vector3)
+        gyroPub = rospy.Publisher(topic_name+'/Gyroscope', Vector3)
+        accelPub = rospy.Publisher(topic_name+'/Accelerometer', Vector3)
+        linearPub = rospy.Publisher(topic_name+'/LinearAcceleration', Vector3)
+        gravityPub = rospy.Publisher(topic_name+'/GravityAcceleration', Vector3)
 
         while not rospy.is_shutdown():
             eulerPub.publish(self.getEuler())

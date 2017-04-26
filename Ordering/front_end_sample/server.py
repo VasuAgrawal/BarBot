@@ -258,18 +258,12 @@ class SetUpHandler(PostgresHandler):
     @tornado.gen.coroutine
     def get(self):
         print("initializing")
-
-        user_sql = """
-                DROP TABLE users CASCADE
-        """
-        user_cursor = yield self.db().execute(user_sql)
-        
         # USER TABLE INIT
         user_sql = """
                 CREATE SEQUENCE IF NOT EXISTS user_id;
                 CREATE TABLE IF NOT EXISTS users (
                     id integer PRIMARY KEY DEFAULT nextval('user_id') ,
-                    name  varchar(80) UNIQUE,
+                    name  varchar(80),
                     email  varchar(80) UNIQUE,
                     password  varchar(80),
                     wristbandID integer
@@ -306,8 +300,6 @@ class SetUpHandler(PostgresHandler):
             """
         order_cursor = yield self.db().execute(order_sql)
 
-        sql = """ DELETE FROM orders """
-        yield self.db().execute(sql)
 
         self.write("DONE\n")
         self.finish()
@@ -344,7 +336,9 @@ class BatBotApplication(tornado.web.Application):
         tornado.web.Application.__init__(self, handlers, **settings)
 
         #dsn = 'dbname=template1 user=Kim password=icanswim ' \
-        dsn = 'dbname=template1 user=postgres ' \
+        #dsn = 'dbname=template1 user=postgres ' \
+        #          'host=localhost port=10601'
+        dsn = 'dbname=barbotdb user=barbotdev password=icanswim ' \
                   'host=localhost port=10601'
 
         self.db = momoko.Pool(dsn=dsn, size=2, ioloop=ioloop)
