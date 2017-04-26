@@ -192,6 +192,7 @@ class Visualizer(object):
         self._pdist_measured = []
         self._beacon_pos_guess = dict()
         self._wristband_pos_guess = dict()
+        self._plot_points = []
 
 
     def format_measured(self):
@@ -222,10 +223,14 @@ class Visualizer(object):
 
 
     def plot(self):
-        plt.ion()
-        fig = plt.figure(1)
-        plt.clf()
-        ax = fig.add_subplot(111, projection='3d')
+        # fig = plt.figure(1)
+        # plt.clf()
+        fig = plt.gcf()
+        ax = plt.gca()
+        # ax = fig.add_subplot(111, projection='3d')
+        for p in self._plot_points:
+            p.remove()
+        self._plot_points = []
 
         # First, we make a local copy of the data so that the lock is free. In
         # this case, we'll care about both the measurements as well as the
@@ -250,35 +255,32 @@ class Visualizer(object):
             beacon_xs.append(point[0])
             beacon_ys.append(point[1])
             beacon_zs.append(point[2])
-            ax.plot([point[0]], [point[1]], [point[2]], marker='s', c=colors[i], alpha=1.0)
+            res, = ax.plot([point[0]], [point[1]], [point[2]], marker='s', 
+                    c=colors[i % len(colors)], alpha=1.0)
+            self._plot_points.append(res)
             i += 1
 
-        #if beacon_xs and beacon_ys and beacon_zs:
-        #    ax.plot(beacon_xs, beacon_ys, beacon_zs, marker='s', 
-        #            c=[0.0, 1.0, 0.0, 1.0], alpha=1.0)
 
-        wristband_xs = []
-        wristband_ys = []
-        wristband_zs = []
         for key, point in self._wristband_pos_guess.items():
-            wristband_xs.append(point[0])
-            wristband_ys.append(point[1])
-            wristband_zs.append(point[2])
-
-        if wristband_xs and wristband_ys and wristband_zs:
-            ax.scatter(wristband_xs, wristband_ys, wristband_zs, marker='s',
+            res, = ax.plot([point[0]], [point[1]], [point[2]], marker='s',
                     c=[1.0, 0.0, 0.0, 1.0], alpha=1.0)
+            self._plot_points.append(res)
+
 
         ax.set_xlabel("X axis (m)")
         ax.set_ylabel("Y axis (m)")
         ax.set_zlabel("Z axis (m)")
-        plt.title("Calculated positions on server")
+        # Has some weird sliding effect.
+        # plt.title("Calculated positions on server")
 
         plt.show(False)
         plt.pause(.001)
 
     
     def run(self):
+        plt.ion()
+        ax = plt.gcf().add_subplot(111, projection='3d')
+
         while True:
             start = time.time()
             
