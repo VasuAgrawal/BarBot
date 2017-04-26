@@ -67,7 +67,7 @@ class LoginHandler(PostgresHandler):
             self.set_secure_cookie("id", str(user["id"]))
 
             print(self.get_current_user())
-            self.redirect("/")
+            self.redirect("/setup/")
 
 class RegisterHandler(PostgresHandler):
     @tornado.gen.coroutine
@@ -301,8 +301,106 @@ class SetUpHandler(PostgresHandler):
         order_cursor = yield self.db().execute(order_sql)
 
 
+        self.redirect("/")
+
+class ResetHandler(PostgresHandler):
+    @tornado.gen.coroutine
+    @tornado.web.authenticated
+    def get(self):
+        print("reseting")
+        # USER TABLE INIT
+        user_sql = """
+                CREATE SEQUENCE IF NOT EXISTS user_id;
+                CREATE TABLE IF NOT EXISTS users (
+                    id integer PRIMARY KEY DEFAULT nextval('user_id') ,
+                    name  varchar(80),
+                    email  varchar(80) UNIQUE,
+                    password  varchar(80),
+                    wristbandID integer
+                );
+                ALTER SEQUENCE user_id OWNED BY users.id;
+            """
+        user_cursor = yield self.db().execute(user_sql)
+
+
+        # DRINKS MENU INIT
+        drink_sql = """
+                CREATE SEQUENCE IF NOT EXISTS drink_id;
+                CREATE TABLE IF NOT EXISTS drinks (
+                    id integer PRIMARY KEY DEFAULT nextval('drink_id') ,
+                    name  varchar(80) UNIQUE,
+                    price real 
+                );
+                ALTER SEQUENCE drink_id OWNED BY drinks.id;
+            """
+        drink_cursor = yield self.db().execute(drink_sql)
+
+        # ORDERS INIT
+        sql = "DROP TABLE orders;"
+        cursor = yield self.db().execute(sql)
+
+        order_sql = """
+                CREATE SEQUENCE IF NOT EXISTS order_id;
+                CREATE TABLE IF NOT EXISTS orders (
+                    id integer PRIMARY KEY DEFAULT nextval('order_id'),
+                    user_id integer REFERENCES users(id) ON UPDATE CASCADE ON DELETE CASCADE,
+                    drink_id integer REFERENCES drinks(id) ON UPDATE CASCADE ON DELETE CASCADE,
+                    completed boolean DEFAULT FALSE,
+                    time timestamp,
+                    robot_id integer DEFAULT -1,
+                    priority integer
+                );
+                ALTER SEQUENCE order_id OWNED BY orders.id;
+            """
+        order_cursor = yield self.db().execute(order_sql)
+
+
         self.write("DONE\n")
         self.finish()
+
+class SchedulerHandler(PostgresHandler):
+    @tornado.gen.coroutine
+    def get(self):
+        order_sql = """
+            SELECT id, user_id, drink_id, completed, time, robot_id, priority
+            FROM orders
+            ORDER BY time
+        """
+
+        order_cursor = yield self.db().execute(order_sql)
+
+        self.write("%r" % (order_cursor.fetchall(),))
+        self.finish()
+    
+    @tornado.gen.coroutine
+    def post(self):
+        id = int(self.get_argument("id"))
+        robot_id = int(self.get_argument("robot_id"))
+        priority = int(self.get_argument("priority"))
+        sql = """
+            UPDATE orders
+            SET robot_id=%s, priority=%s
+            WHERE id=%s
+        """
+
+        order_cursor = yield self.db().execute(sql, (robot_id, priority, id))
+
+        self.write("Done!\n")
+        self.finish()
+
+    @tornado.gen.coroutine
+    def delete(self):
+        id = int(self.get_argument("id"))
+        sql = """
+            DELETE FROM orders WHERE id = %s;
+        """
+
+        order_cursor = yield self.db().execute(sql, (id, ))
+
+        self.write("Done!\n")
+        self.finish()
+        
+
         
 class BatBotApplication(tornado.web.Application):
     def __init__(self, ioloop):
@@ -313,6 +411,7 @@ class BatBotApplication(tornado.web.Application):
             #TODO tune these regex
             (r"/?", RootHandler),
             (r"/setup/?", SetUpHandler),
+            (r"/reset/?", ResetHandler),
             (r"/customer/?", CustomerHandler),
             (r"/bartender/?", BartenderHandler),
             (r"/menu/?", MenuHandler),
@@ -320,6 +419,7 @@ class BatBotApplication(tornado.web.Application):
             (r"/v0/order/", ApiOrderHandler),
             (r"/v0/robot/", ApiRobotHandler),
             (r"/v0/customer/", ApiCustomerHandler),
+            (r"/scheduler/", SchedulerHandler),
             (r"/login/?", LoginHandler),
             (r"/register/?", RegisterHandler),
             (r"/about/?", AboutHandler),
