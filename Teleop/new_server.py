@@ -19,22 +19,23 @@ import threading
 
 
 # TODO: Search through serial ports, open up the first one.
-try:
-    ser = serial.Serial('/dev/ttyUSB0', 115200)
-except Exception:
-    ser = None
-# ser = None
+# try:
+    # ser = serial.Serial('/dev/ttyUSB0', 115200)
+# except Exception:
+    # ser = None
+ser = None
 
 ALIVE = False
 alive_time = time.time()
 last_write_time = time.time()
 
 out_message_lock = threading.Lock()
-out_message = "1500 1500\n"
+out_message = "1500,1500\n"
 
+FAKE_FREQ = 48
+FREQ = 50
 pwm = PWM(0x40)
-PWM_FREQ = 50
-pwm.setPWMFreq(PWM_FREQ)
+pwm.setPWMFreq(FAKE_FREQ)
 
 def map_value(x, from_lo, from_hi, to_lo, to_hi):
     from_range = from_hi - from_lo
@@ -42,21 +43,30 @@ def map_value(x, from_lo, from_hi, to_lo, to_hi):
     return (((x - from_lo) / from_range) * to_range) + to_lo
 
 
-def writer():
-    while True:
-        start = time.time()
-        with out_message_lock:
-            logging.debug("Should be writing %s", repr(out_message))
-            if (ser):
-                logging.info("Finally writing %s", repr(out_message))
-                ser.write(out_message.encode('ascii'))
-            else:
-                logging.warning("Not connected to serial port?")
+# def writer():
+    # while True:
+        # start = time.time()
+        # with out_message_lock:
+            # logging.debug("Should be writing %s", repr(out_message))
+            # if (ser):
+                # logging.info("Finally writing %s", repr(out_message))
+                # ser.write(out_message.encode('ascii'))
+            # else:
+                # logging.warning("Not connected to serial port?")
 
-        time.sleep(max(0, .2 - (time.time() - start)))
+        # time.sleep(max(0, .2 - (time.time() - start)))
 
 
 def I2C_writer():
+
+    us_per_second = 1000000 # us per second
+    us_per_pulse = us_per_second / FREQ # us per pulse
+    bits_per_pulse = 4096
+    bits_per_us = bits_per_pulse / us_per_pulse
+
+    LEFT_CHANNEL = 0
+    RIGHT_CHANNEL = 3
+
     while True:
         start = time.time()
         out = ""
@@ -65,15 +75,15 @@ def I2C_writer():
             out = copy.deepcopy(out_message)
 
         logging.debug("Should be writing %s", repr(out))
-        left, right = map(int, out.strip().split())
+        left, right = map(int, out.strip().split(","))
 
-        us_per_s = 1000000
-        periods_per_s = PWM_FREQ
-        us_per_period = us_per_s / periods_per_s
-        ticks_per_period = 4096
-        ticks_per_us = ticks_per_period / us_per_period
-        pwm.setPWM(0, 0, int(left * ticks_per_us))
-        pwm.setPWM(3, 0, int(right * ticks_per_us))
+        left_val = int(left * bits_per_us)
+        right_val = int(right * bits_per_us)
+
+        logging.info("Writing %d to channel %d", left_val, LEFT_CHANNEL)
+        logging.info("Writing %d to channel %d", right_val, RIGHT_CHANNEL)
+        pwm.setPWM(LEFT_CHANNEL, 0, left_val)
+        pwm.setPWM(RIGHT_CHANNEL, 0, right_val)
 
         time.sleep(max(0, .2 - (time.time() - start)))
         
@@ -190,8 +200,8 @@ class JoystickServer(tornado.httpserver.HTTPServer):
 
 
 if __name__ == "__main__":
-    threading.Thread(target=writer).start()
-    logging.getLogger().setLevel(logging.DEBUG)
+    threading.Thread(target=I2C_writer).start()
+    logging.getLogger().setLevel(logging.INFO)
     JoystickServer().listen(8000)
     # tornado.ioloop.PeriodicCallback(writer, 200).start() # Call watchdog every 1 sec
     tornado.ioloop.IOLoop.current().start()
