@@ -43,10 +43,14 @@ class IMU(object):
     def getEuler(self):
         # Euler angles in degrees
         heading, roll, pitch = self.bno.read_euler()
-        return Euler(heading, roll, pitch)
+        msg = Euler()
+        msg.heading = heading
+        msg.roll = roll
+        msg.pitch = pitch
+        return msg
 
     def getQuaternion(self):
-        x, y, z, w = self.bno.read_quaterion()
+        x, y, z, w = self.bno.read_quaternion()
         return Quaternion(x, y, z, w)
 
     def getMagnetometer(self):
@@ -77,4 +81,4 @@ class IMU(object):
         return Vector3(x, y, z)
 
 if __name__ == '__main__':
-    pass
+    imu = IMU("IMU", "/imu_topic")
