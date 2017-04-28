@@ -23,6 +23,7 @@
 #include <iostream>
 #include <string>
 #include <unistd.h>
+#include <sys/time.h>
 
 #include <deca_device_api.h>
 #include <deca_regs.h>
@@ -78,6 +79,8 @@
 #define MSG_DEST_ADDR_IDX 4
 #define MSG_SRC_ADDR_IDX 6
 #define MSG_TYPE_IDX 8
+#define SWITCH_MSG_TIME_SEC_IDX 9
+#define SWITCH_MSG_TIME_USEC_IDX 13
 
 // UWB microsecond (uus) to device time unit (dtu, around 15.65 ps) conversion factor. 1 uus = 512 / 499.2 µs and 1 µs = 499.2 * 128 dtu.
 #define UUS_TO_DWT_TIME 65536
@@ -122,7 +125,7 @@ static uint8 rx_resp_msg[] = {0x41, 0x88, 0xCA, 0xDE, 'V', 'E', 'W', 'A', MSG_TY
 static uint8 tx_final_msg[] = {0x41, 0x88, 0xCA, 0xDE, 'W', 'A', 'V', 'E', MSG_TYPE_FINAL, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
 static uint8 rx_final_msg[] = {0x41, 0x88, 0xCA, 0xDE, 'W', 'A', 'V', 'E', MSG_TYPE_FINAL, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
 static uint8 master_switch_msg[] = {0x41, 0x88, 0xCA, 0xDE, 'W', 'A', 'V', 'E', MSG_TYPE_MASTER_SWITCH, 0, 0};
-static uint8 mode_switch_msg[] = {0x41, 0x88, 0xCA, 0xDE, 'W', 'A', 'V', 'E', MSG_TYPE_MODE_SWITCH, 0, 0};
+static uint8 mode_switch_msg[] = {0x41, 0x88, 0xCA, 0xDE, 'W', 'A', 'V', 'E', MSG_TYPE_MODE_SWITCH, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
 
 // Buffer to store received response message.
 static uint8 rx_buffer[RX_BUF_LEN];
@@ -170,6 +173,8 @@ static uint64 get_tx_timestamp_u64(void);
 static uint64 get_rx_timestamp_u64(void);
 static void final_msg_set_ts(uint8 *ts_field, uint64 ts);
 static void final_msg_get_ts(const uint8 *ts_field, uint32 *ts);
+static void switch_msg_set_sys_time();
+static void switch_msg_get_sys_time(const uint8 *rx_buf, struct timeval *tv);
 static void set_msg_addresses(uint8 master_addr, uint8 slave_addr);
 static int validate_frame(uint8* frame, uint8 expected_type);
 
@@ -244,6 +249,7 @@ int main(int argc, char *argv[]) {
         }
         else if (mode == TRACKING) {
             INFO_PRINT(("Entered tracking mode\n"));
+            deca_sleep(500 * (device_addr - NUM_BEACONS));
             while(1) {
                 // Regularly ping the beacon network
                 for (uint8 target_addr = 0; target_addr < NUM_BEACONS; target_addr++) {
@@ -251,6 +257,7 @@ int main(int argc, char *argv[]) {
                     computeDistanceInit();
                     deca_sleep(RNG_DELAY_MS);
                 }
+                deca_sleep(1000);
             }
         }
     }
@@ -495,6 +502,40 @@ static void final_msg_get_ts(const uint8 *ts_field, uint32 *ts) {
     *ts = 0;
     for (i = 0; i < FINAL_MSG_TS_LEN; i++) {
         *ts += ts_field[i] << (i * 8);
+    }
+}
+
+/**
+ * Fill the time fields in the switch message with the current system time.
+ */
+static void switch_msg_set_sys_time() {
+    int i;
+    struct timeval tv;
+    gettimeofday(&tv, NULL);
+
+    INFO_PRINT(("Sending time of: %d sec, %d us\n", tv.tv_sec, tv.tv_usec));
+
+    for (i = 0; i < 4; i++) {
+        mode_switch_msg[SWITCH_MSG_TIME_SEC_IDX + i] = (uint8)tv.tv_sec;
+        mode_switch_msg[SWITCH_MSG_TIME_USEC_IDX + i] = (uint8)tv.tv_usec;
+
+        tv.tv_sec >>= 8;
+        tv.tv_usec >>= 8;
+    }
+}
+
+/**
+ * Fill a given system time struct with the values from the message.
+ */
+static void switch_msg_get_sys_time(const uint8 *rx_buf, struct timeval *tv) {
+    int i;
+
+    tv->tv_sec = 0;
+    tv->tv_usec = 0;
+
+    for (i = 0; i < 4; i++) {
+        tv->tv_sec += rx_buf[SWITCH_MSG_TIME_SEC_IDX + i] << (i * 8);
+        tv->tv_usec += rx_buf[SWITCH_MSG_TIME_USEC_IDX + i] << (i * 8);
     }
 }
 
