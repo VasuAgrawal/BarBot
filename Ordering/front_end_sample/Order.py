@@ -1,3 +1,5 @@
+import random
+
 class Order(object):
 
     def __init__(self, id, userId, drinkId, drinkType=None, completed=False, time=None, robot=None, priority=None):
@@ -10,8 +12,12 @@ class Order(object):
         self.robot = robot
         self.priority = priority
 
-    def getLocation(self, data):
-        return data.locations[self.id]
+    def getLocation(self, data=None):
+        #TODO: Use GLS here
+        if data != None:
+            return data.locations[self.id]
+        else:
+            return (random.randint(5, 10), random.randint(5, 10))
 
     def __eq__(self, other):
         return isinstance(other, Order) and self.id == other.id
