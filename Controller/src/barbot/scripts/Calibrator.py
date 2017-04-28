@@ -58,13 +58,13 @@ def handle_user_input():
                 try:
                     location_data.append(location_deq.popleft())
                 except IndexError:
-                    pass
+                    rospy.logwarn("Error in getting location data")
 
-            # if len(imu_data) < DESIRED:
-                # try:
-                    # imu_data.append(imu_deq.popleft())
-                # except IndexError:
-                    # pass
+            if len(imu_data) < DESIRED:
+                try:
+                    imu_data.append(imu_deq.popleft())
+                except IndexError:
+                    rospy.logwarn("Error in getting imu data")
 
         avg_x = average([data.point.x for data in location_data])
         avg_y = average([data.point.y for data in location_data])
@@ -87,5 +87,5 @@ if __name__ == "__main__":
     
     rospy.init_node("Calibrator", log_level=rospy.INFO)
     rospy.Subscriber("raw_location", PointStamped, handle_location)
-    rospy.Subscriber("imu_data/Euler", Euler, handle_imu)
+    rospy.Subscriber("imu_topic/Euler", Euler, handle_imu)
     rospy.spin()
