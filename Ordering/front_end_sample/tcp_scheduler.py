@@ -202,9 +202,9 @@ if __name__ == "__main__":
     scheduler.listen(4242)
     logging.info("Starting scheduler!")
 
-    print("about to get orders")
-    ioloop.run_sync(scheduler.updateScheduler)
-    print("got orders")
+    # print("about to get orders")
+    # ioloop.run_sync(scheduler.updateScheduler)
+    # print("got orders")
 
     # tornado.ioloop.PeriodicCallback(scheduler.updateScheduler, 1000).start()
     logging.info("Starting robot updater!")
