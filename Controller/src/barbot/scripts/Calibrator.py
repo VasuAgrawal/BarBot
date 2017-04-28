@@ -13,19 +13,40 @@ from geometry_msgs.msg import PointStamped
 location_deq = collections.deque(maxlen=10)
 imu_deq = collections.deque(maxlen=10)
 
+calibration_points = []
+calibrated = False
+
 
 def handle_location(data):
     location_deq.append(data)
 
+    # If calibrated, convert this reading into a calibrated one and republish.
+    if calibrated:
+        location_pub.publish(data) # Do something better here
+
 
 def handle_imu(data):
     imu_deq.append(data)
+    
+    # If calibrated, convert this reading into a calibrated one and republish.
+    if calibrated:
+        location_pub.publish(data)
 
 
 def average(iterable):
     if iterable:
         return sum(iterable) / len(iterable)
     return 0
+
+
+class CalibrationPoint(object):
+    def __init__(self, x, y, z, roll, pitch, heading):
+        self.x = x
+        self.y = y
+        self.z = z
+        self.roll = roll
+        self.pitch = pitch
+        self.heading = heading
 
 
 def handle_user_input():
@@ -60,11 +81,11 @@ def handle_user_input():
                 except IndexError:
                     rospy.logwarn("Error in getting location data")
 
-            if len(imu_data) < DESIRED:
-                try:
-                    imu_data.append(imu_deq.popleft())
-                except IndexError:
-                    rospy.logwarn("Error in getting imu data")
+            # if len(imu_data) < DESIRED:
+                # try:
+                    # imu_data.append(imu_deq.popleft())
+                # except IndexError:
+                    # rospy.logwarn("Error in getting imu data")
 
         avg_x = average([data.point.x for data in location_data])
         avg_y = average([data.point.y for data in location_data])
@@ -75,16 +96,29 @@ def handle_user_input():
         rospy.loginfo("Calibration parameters at %s:\n"
                 "location: [x:    %f, y:     %f, z:       %f]\n"
                 "imu:      [roll: %f, pitch: %f, heading: %f]\n",
-                location, avg_x, avg_y, avg_z, avg_heading,
-                avg_roll, avg_pitch)
+                location, avg_x, avg_y, avg_z, avg_roll,
+                avg_pitch, avg_heading)
+        calibration_points.append(CalibrationPoint(avg_x, avg_y, avg_z,
+            avg_roll, avg_pitch, avg_heading))
+
+
+    global calibrated
+    calibrated = True
 
     rospy.loginfo("Ending calibration sequence.")
+    rospy.loginfo("Beginning to send data on calibrated channels.")
 
 
 if __name__ == "__main__":
 
     threading.Thread(target=handle_user_input).start()
     
+    global location_pub
+    global imu_pub
+    location_pub = rospy.Publisher("calibrated_location", PointStamped, 
+            queue_size=1)
+    imu_pub = rospy.Publisher("calibrated_imu", Euler, queue_size=1)
+
     rospy.init_node("Calibrator", log_level=rospy.INFO)
     rospy.Subscriber("raw_location", PointStamped, handle_location)
     rospy.Subscriber("imu_topic/Euler", Euler, handle_imu)
