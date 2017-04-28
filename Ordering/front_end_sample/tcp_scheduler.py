@@ -126,6 +126,7 @@ if __name__ == "__main__":
     logging.getLogger().setLevel(logging.DEBUG)
     scheduler = Scheduler()
     scheduler.listen(4242)
+    logging.info("Starting scheduler!")
 
     ioloop = tornado.ioloop.IOLoop.instance()
     # #set up database
@@ -141,5 +142,6 @@ if __name__ == "__main__":
     # ioloop.run_sync(scheduler.sendPost)
 
     # tornado.ioloop.PeriodicCallback(scheduler.updateScheduler, 1000).start()
+    logging.info("Starting robot updater!")
     tornado.ioloop.PeriodicCallback(scheduler.update_robots, 1000).start()
     ioloop.start()
