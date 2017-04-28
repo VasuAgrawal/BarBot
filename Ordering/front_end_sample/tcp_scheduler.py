@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 import logging
 
+import datetime
 import momoko
 from Order import Order
 from Robot import Robot
@@ -17,16 +18,20 @@ from positions_pb2 import Locations
 from positions_pb2 import ConnectionRequest
 
 class Scheduler(tornado.tcpserver.TCPServer):
-    def __init__(self, *args, **kwargs):
+    def __init__(self, ioloop, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
         self.http_client = httpclient.AsyncHTTPClient()
 
+        # TODO: update these with actual coordinates of the bar
+        self.barX = 0
+        self.barY = 0
         self.numRobots = 2
         self.robots = []
         for i in range(self.numRobots):
             #TODO: replace this location with location from GLS
             self.robots.append(Robot(i, location=(0,0)))
+        self.orderQueue = []
 
         self._real_robots = []
         self._loc = Locations()
@@ -85,60 +90,120 @@ class Scheduler(tornado.tcpserver.TCPServer):
             except Exception:
                 self._real_robots.remove(robot)
 
+    @tornado.gen.coroutine
+    def getAllOrders(self):
+        print("getting orders")
+        destination = 'http://localhost:8080/scheduler/'
+        request = httpclient.HTTPRequest(destination, method="GET")
+        response = yield self.http_client.fetch(request)
+        db_orders = eval(response.buffer.read()) #I'm sorry Kosbie
+        orders = []
+        for (id, userId, drinkId, completed, time, robotId, priority) in db_orders:
+            robot = None if robotId == -1 else self.robots[robotId]
 
-    # @tornado.gen.coroutine
-    # def sendPost(self):
-        # destination = 'http://localhost:8080/test/'
-        # request = httpclient.HTTPRequest(destination, body='woo', method="POST")
-        # response = yield self.http_client.fetch(request)
-        # print(response)
+            orders.append(Order(id, userId, drinkId, completed=completed, time=time, robot=robot, priority=priority))
 
-    # #read orders from the database
-    # def getAllOrders(self):
-        # print("getting the orders")
-        # order_sql = """
-            # SELECT id, user_id, drink_id, completed, time, robot_id, priority
-            # FROM orders
-            # ORDER BY time
-        # """
-        # order_cursor = yield db.execute(order_sql)
-        # newOrders = order_cursor.fetchall()
+        return orders
 
-        # orders = []
-        # for (id, userId, drinkId, completed, time, robotId, priority) in newOrders:
-            # robot = None if robotId == -1 else self.robots[robotId]
+    def updateAssignedOrders(self, allOrders):
+        for robot in self.robots:
+            for assignedOrder in robot.getOrders():
+                for newOrder in allOrders:
+                    if newOrder.id == assignedOrder.id:
+                        assignedOrder.completed = newOrder.completed
+                        assignedOrder.priority = newOrder.priority
 
-            # #TODO: get wristbandID then location from GLS
-            # orders.append(Order(id, userId, drinkId, completed=completed,
-                                # time=time, robot=robot, priority=priority))
-        # print("got all the orders")
-        # return orders
+    # sort robots by distance remaining in their trip
+    def sortRobots(self):
+        robotDistances = dict()
+        for robot in self.robots:
+            robotDistances[robot.id] = robot.getTripDistance(self.barX, self.barY)
+        return sorted(robotDistances.keys(), key=lambda robot: robotDistances[robot])
 
+    def distance(x1, y1, x2, y2):
+        return math.sqrt((x1 - x2)**2 + (y1 - y2)**2)
 
-    # #update the scheduler with stuff
-    # def updateScheduler(self):
-        # orders = list(self.getAllOrders())
+    def getClosestOrders(self, firstOrder, orders):
+        (fx, fy) = firstOrder.getLocation()
+        return sorted(orders, key=lambda order: distance(fx, fy, *order.getLocation()))
+
+    def assignRestOfOrders(self, robot, uncompletedOrders, finalQueue, robotOrders):
+        remainingOrders = self.getClosestOrders(self, robotOrders[0], uncompletedOrders)
+        remainingOrders = remainingOrders[0 : robot.capacity - len(robotOrders)]
+        robotOrders.extend(remainingOrders)
+        for assignedOrder in remainingOrders:
+            uncompletedOrders.remove(assignedOrder)
+            assignedOrder.robot = robots
+            assignedOrder.priority = len(finalQueue)
+            finalQueue.append(assignedOrder)
+
+    def assignOrders(self, uncompletedOrders):
+        robotQueue = self.sortRobots()
+        finalQueue = []
+        firstPass = True
+        while (len(uncompletedOrders) > 0):
+            for robotId in robotQueue:
+                if len(uncompletedOrders) == 0: break
+                robot = self.robots[robotId]
+                if firstPass and not robot.inTransit:
+                    robotOrders = robot.getOrders()
+                    # don't reassign orders already assigned to it
+                    for assignedOrder in robotOrders:
+                        if assignedOrder in uncompletedOrders:
+                            uncompletedOrders.remove(assignedOrder)
+                        else: # order must have been completed
+                            assignedOrder.completed = True
+                        assignedOrder.priority = len(finalQueue)
+                        finalQueue.append(assignedOrder)
+                    if len(robotOrders) == 0:
+                        # assign it the first one
+                        firstOrder = uncompletedOrders.pop(0)
+                        firstOrder.robot = robot
+                        firstOrder.priority = len(finalQueue)
+                        robotOrders.append(firstOrder)
+                        finalQueue.append(firstOrder)
+                    self.assignRestOfOrders(robot, uncompletedOrders, finalQueue, robotOrders)
+                else:
+                    # temporarily assign orders to remaining robots
+                    firstOrder = uncompletedOrders.pop(0)
+                    firstOrder.robot = robot
+                    firstOrder.priority = len(finalQueue)
+                    finalQueue.append(firstOrder)
+                    robotOrders = [firstOrder]
+                    self.assignRestOfOrders(robot, uncompletedOrders, finalQueue, robotOrders)
+            firstPass = False
+        return finalQueue
+
+    def updateDatabase(self):
+        # insert new priorities, robots
+        for order in self.orderQueue:
+            robotId = -1 if order.robot == None else order.robot.id
+            body = 'robot_id=%s,id=%s,priority=%s' % (robotId, order.id, order.priority)
+            destination = 'http://localhost:8080/scheduler/'
+            request = httpclient.HTTPRequest(destination, body=body, method="POST")
+            response = yield self.http_client.fetch(request)
         
-        # print("orders!", orders)
-
+    def updateScheduler(self):
+        print("updating scheduler")
+        allOrders = self.getAllOrders()
+        print(allOrders)
+        self.updateAssignedOrders(allOrders)
+        uncompletedOrders = list(filter(lambda order: not order.completed, allOrders))
+        newQueue = self.assignOrders(uncompletedOrders)
+        if newQueue != self.orderQueue:
+            self.orderQueue = newQueue
+            self.updateDatabase()
+        print(newQueue)
 
 if __name__ == "__main__":
     logging.getLogger().setLevel(logging.DEBUG)
-    scheduler = Scheduler()
+    ioloop = tornado.ioloop.IOLoop.instance()
+    scheduler = Scheduler(ioloop)
     scheduler.listen(4242)
 
-    ioloop = tornado.ioloop.IOLoop.instance()
-    # #set up database
-    # # dsn = 'dbname=template1 user=Kim password=icanswim ' \
-    # dsn = 'dbname=template1 user=postgres '\
-                  # 'host=localhost port=10601'
-    # db = momoko.Pool(dsn=dsn, size=2, ioloop=ioloop)
-    # dbConnection = db.connect()
-    # ioloop.add_future(dbConnection, lambda f: ioloop.stop())
-    # ioloop.start()
-    # dbConnection.result()
-
-    # ioloop.run_sync(scheduler.sendPost)
+    print("about to get orders")
+    ioloop.run_sync(scheduler.updateScheduler)
+    print("got orders")
 
     # tornado.ioloop.PeriodicCallback(scheduler.updateScheduler, 1000).start()
     tornado.ioloop.PeriodicCallback(scheduler.update_robots, 1000).start()
