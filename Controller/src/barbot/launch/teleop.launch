@@ -1,3 +1,4 @@
 <launch>
     <node name="MotorDriver" pkg="barbot" type="MotorDriver.py" />
+    <node name="TeleopServer" pkg="barbot" type="TeleopServer.py" />
 </launch>

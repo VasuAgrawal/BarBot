@@ -18,8 +18,10 @@ import tornado.websocket
 
 import rospy
 from barbot.msg import Thruster
+from barbot.msg import Mode
 
 thruster_queue = Queue.Queue()
+mode_queue = Queue.Queue()
 
 
 class RootHandler(tornado.web.RequestHandler):
@@ -73,8 +75,16 @@ class GamepadHandler(tornado.websocket.WebSocketHandler):
         msg.left = outputs[0]
         msg.right = outputs[1]
         thruster_queue.put(msg)
-        # with (yield thruster_pub_lock.acquire()):
-            # thruster_pub.publish(msg)
+
+
+        if state['buttons'][0]: # A
+            msg = Mode()
+            msg.mode = Mode.AUTON
+            mode_queue.put(msg)
+        elif state['buttons'][1]: # B
+            msg = Mode()
+            msg.mode = Mode.TELEOP
+            mode_queue.put(msg)
 
 
     def open(self):
@@ -92,12 +102,6 @@ class GamepadHandler(tornado.websocket.WebSocketHandler):
         msg.right = 0
         thruster_queue.put(msg)
         
-        # msg = Thruster()
-        # msg.left = 0
-        # msg.right = 0
-        # with (yield thruster_pub_lock.acquire()):
-            # thruster_pub.publish(msg)
-
 
 class JoystickServer(tornado.httpserver.HTTPServer):
     
@@ -125,33 +129,45 @@ class JoystickServer(tornado.httpserver.HTTPServer):
 def check_dead():
     if rospy.is_shutdown():
         rospy.logwarn("Shutting down webserver!")
+        sys.exit()
 
 def webserver():
     rospy.loginfo("Starting webserver!")
     JoystickServer().listen(8000)
-    tornado.ioloop.PeriodicCallback(check_dead(), 500).start()
+    tornado.ioloop.PeriodicCallback(check_dead, 500).start()
     tornado.ioloop.IOLoop.current().start()
 
 
 def ros_publisher():
 
-    rospy.logdebug("Starting to wait on item.")
+    rospy.logdebug("Starting to wait on data items.")
     while not rospy.is_shutdown():
         try:
-            item = thruster_queue.get(timeout=.5)
-            rospy.loginfo("Ros node received item: %s", item)
-            thruster_pub.publish(item)
+            thruster_msg = thruster_queue.get(timeout=.5)
+            rospy.loginfo("Ros node received thruster item: %s", thruster_msg)
+            thruster_pub.publish(thruster_msg)
         except Queue.Empty:
-            rospy.logdebug("No messages in queue to publish.")
+            rospy.logdebug("No messages in thruster queue to publish.")
+
+        try:
+            mode_msg = mode_queue.get_nowait()
+            rospy.loginfo("Ros node received mode item: %s", mode_msg)
+            mode_pub.publish(mode_msg)
+        except Queue.Empty:
+            rospy.logdebug("No messages in mode queue to publish.")
+
     rospy.logwarn("Shutting down ros publisher!")
     sys.exit(0)
 
 
 if __name__ == "__main__":
     global thruster_pub
+    global mode_pub 
     thruster_pub = rospy.Publisher("teleop", Thruster, queue_size=1)
+    mode_pub = rospy.Publisher("mode", Mode, queue_size=1)
     rospy.init_node("Teleop_server", log_level=rospy.INFO)
 
-    threading.Thread(target=webserver).start()
+    tornado_thread = threading.Thread(target=webserver).start()
     ros_publisher()
+    sys.exit(0)
 
