@@ -2,10 +2,9 @@ import random
 
 class Order(object):
 
-    def __init__(self, id, wristbandId, drinkId, drinkType=None, completed=False, time=None, robot=None, priority=None):
+    def __init__(self, id, wristbandId=None, drinkType=None, completed=False, time=None, robot=None, priority=None):
         self.id = id
         self.wristbandId = wristbandId
-        self.drinkId = drinkId
         self.drinkType = drinkType
         self.completed = completed
         self.time = time

@@ -118,7 +118,23 @@ class CustomerHandler(PostgresHandler):
         for item in result:
             drink = Drink(item['id'], item['name'], item['price'])
             drinks.append(drink)
-        self.render("static/html/customer.html", drinks=drinks)
+
+        # get customer's current orders
+        sql = """
+            SELECT id, drink_id, completed, time
+            FROM orders
+            WHERE user_id=%s
+        """
+        cursor = yield self.db().execute(sql, (self.get_current_user(),))
+        result = cursor.fetchall()
+        currentOrders = []
+        for (id, drink_id, completed, time) in result:
+            drink_name = ""
+            for drink in drinks:
+                if drink_id == drink.id: drink_name = drink.type
+            currentOrders.append(Order(id=id, drinkType=drink_name, completed=completed, time=time))
+        
+        self.render("static/html/customer.html", drinks=drinks, orders=currentOrders)
 
 class MenuHandler(PostgresHandler):
     @tornado.web.authenticated
@@ -185,7 +201,7 @@ class BartenderHandler(PostgresHandler):
                 for drink in drinks:
                     if(drink.id == drinkId):
                         drinkName = drink.type
-                order = Order(item['id'], item['wristband_id'], drinkId, drinkName, item['completed'], item['time'], item['robot_id'])
+                order = Order(item['id'], item['wristband_id'], drinkName, item['completed'], item['time'], item['robot_id'])
                 orders.append(order)
             self.render("static/html/bartender.html", orders=orders, drinks=drinks)
 
@@ -202,6 +218,20 @@ class BartenderHandler(PostgresHandler):
             """
             cursor = yield self.db().execute(sql, (id, ))
         self.redirect("/")
+
+# cancel an order
+class ApiCancelHandler(PostgresHandler):
+    @tornado.web.authenticated
+    @tornado.gen.coroutine
+    def post(self):
+        order_id = self.get_argument("orderId", default = None)
+        if order_id:
+            sql = """
+                DELETE FROM orders where id=%s
+            """
+            print("canceling order %s" % order_id)
+            cursor = yield self.db().execute(sql, (order_id,))
+        self.redirect("/customer")
 
 # Insert an order into the database
 class ApiOrderHandler(PostgresHandler):
@@ -355,6 +385,7 @@ class BarBotApplication(tornado.web.Application):
             (r"/customer/?", CustomerHandler),
             (r"/bartender/?", BartenderHandler),
             (r"/menu/?", MenuHandler),
+            (r"/v0/cancel/", ApiCancelHandler),
             (r"/v0/order/", ApiOrderHandler),
             (r"/scheduler/", SchedulerHandler),
             (r"/login/?", LoginHandler),
