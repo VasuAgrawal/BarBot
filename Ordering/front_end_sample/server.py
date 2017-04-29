@@ -102,7 +102,6 @@ class AboutHandler(PostgresHandler):
     def get(self):
         self.render("static/html/about.html")
 
-
 class CustomerHandler(PostgresHandler):
     @tornado.web.authenticated # Example of authentication
     @tornado.gen.coroutine
@@ -222,7 +221,7 @@ class ApiDrinkHandler(PostgresHandler):
     def post(self):
         print(self.get_argument("id"))
 
-
+# Insert an order into the database
 class ApiOrderHandler(PostgresHandler):
     @tornado.web.authenticated
     @tornado.gen.coroutine
@@ -251,7 +250,6 @@ class ApiRobotHandler(PostgresHandler):
 class ApiCustomerHandler(PostgresHandler):
     def get(self):
         self.write(json.dumps({"customer": "customer data"}))
-
 
 #Keeping init scripts here, may not be a great idea
 class SetUpHandler(PostgresHandler):
@@ -423,7 +421,7 @@ class BatBotApplication(tornado.web.Application):
             (r"/login/?", LoginHandler),
             (r"/register/?", RegisterHandler),
             (r"/about/?", AboutHandler),
-            (r"/logout/?", LogoutHandler),
+            (r"/logout/?", LogoutHandler)
         ]
 
         settings = {

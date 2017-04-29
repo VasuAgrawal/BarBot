@@ -25,7 +25,7 @@ class Robot(object):
     def getOrders(self):
         return self.orders
 
-    def getTripDistance(self, data):
+    def getTripDistance(self, barX, barY):
         if not self.inTransit:
             return 0
         else:
@@ -33,10 +33,10 @@ class Robot(object):
             (currX, currY) = self.getLocation()
             totalDist = 0
             for order in self.getOrders():
-                (orderX, orderY) = order.getLocation(data)
+                (orderX, orderY) = order.getLocation()
                 totalDist += distance(currX, currY, orderX, orderY)
                 (currX, currY) = (orderX, orderY)
-            totalDist += distance(currX, currY, data.barX, data.barY)
+            totalDist += distance(currX, currY, barX, barY)
             return totalDist
 
     def move(self, destX, destY):
