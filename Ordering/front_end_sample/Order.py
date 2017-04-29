@@ -15,11 +15,12 @@ class Order(object):
     def getLocation(self, locations):
         locationMap = locations.locations
 
-        #TODO: Use GLS here
-        if data != None:
-            return data.locations[self.id]
+        if self.wristbandId in locationMap:
+            customerPoint = locationMap[self.wristbandId]
+            # do we need to use z here at all?
+            return (customerPoint.x, customerPoint.y)
         else:
-            return (random.randint(5, 10), random.randint(5, 10))
+            raise Exception("Cannot find wristband id %d in location map %r" % (self.wristbandId, locationMap))
 
     def __eq__(self, other):
         return isinstance(other, Order) and self.id == other.id
