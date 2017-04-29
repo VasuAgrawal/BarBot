@@ -2,9 +2,9 @@ import random
 
 class Order(object):
 
-    def __init__(self, id, userId, drinkId, drinkType=None, completed=False, time=None, robot=None, priority=None):
+    def __init__(self, id, wristbandId, drinkId, drinkType=None, completed=False, time=None, robot=None, priority=None):
         self.id = id
-        self.userId = userId
+        self.wristbandId = wristbandId
         self.drinkId = drinkId
         self.drinkType = drinkType
         self.completed = completed
@@ -12,7 +12,9 @@ class Order(object):
         self.robot = robot
         self.priority = priority
 
-    def getLocation(self, data=None):
+    def getLocation(self, locations):
+        locationMap = locations.locations
+
         #TODO: Use GLS here
         if data != None:
             return data.locations[self.id]

@@ -18,7 +18,6 @@ from positions_pb2 import Point
 from positions_pb2 import Locations
 from positions_pb2 import ConnectionRequest
 
-
 def distance(x1, y1, x2, y2):
     return math.sqrt((x1 - x2)**2 + (y1 - y2)**2)
 
@@ -52,7 +51,7 @@ class Scheduler(tornado.tcpserver.TCPServer):
             except tornado.iostream.StreamClosedError:
                 return
 
-            loc = Locations()
+            loc = Locations() #map of wristband id to location
             loc.ParseFromString(message_bytes)
             logging.info("Received location data!")
             self._loc = loc
@@ -122,8 +121,8 @@ class Scheduler(tornado.tcpserver.TCPServer):
 
     # sort orders by distance to firstOrder
     def getClosestOrders(self, firstOrder, orders):
-        (fx, fy) = firstOrder.getLocation()
-        return sorted(orders, key=lambda order: distance(fx, fy, *order.getLocation()))
+        (fx, fy) = firstOrder.getLocation(self._loc)
+        return sorted(orders, key=lambda order: distance(fx, fy, *order.getLocation(self._loc)))
 
     def assignRestOfOrders(self, robot, uncompletedOrders, finalQueue, robotOrders):
         remainingOrders = self.getClosestOrders(robotOrders[0], uncompletedOrders)
