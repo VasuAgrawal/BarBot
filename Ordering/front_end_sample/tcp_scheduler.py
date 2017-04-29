@@ -2,6 +2,7 @@
 import logging
 
 import datetime
+import math
 import momoko
 from Order import Order
 from Robot import Robot
@@ -16,6 +17,10 @@ from tornado import httpclient
 from positions_pb2 import Point
 from positions_pb2 import Locations
 from positions_pb2 import ConnectionRequest
+
+
+def distance(x1, y1, x2, y2):
+    return math.sqrt((x1 - x2)**2 + (y1 - y2)**2)
 
 class Scheduler(tornado.tcpserver.TCPServer):
     def __init__(self, ioloop, *args, **kwargs):
@@ -36,7 +41,6 @@ class Scheduler(tornado.tcpserver.TCPServer):
         self._real_robots = []
         self._loc = Locations()
 
-
     @tornado.gen.coroutine
     def handle_gls(self, stream, address):
         logging.info("Received GLS connection request!")
@@ -52,13 +56,11 @@ class Scheduler(tornado.tcpserver.TCPServer):
             loc.ParseFromString(message_bytes)
             logging.info("Received location data!")
             self._loc = loc
-         
 
     @tornado.gen.coroutine
     def handle_robot(self, stream, address):
         logging.info("Received ROBOT connection request!")
         self._real_robots.append(stream)
-
 
     @tornado.gen.coroutine
     def handle_stream(self, stream, address):
@@ -80,7 +82,6 @@ class Scheduler(tornado.tcpserver.TCPServer):
         else:
             logging.error("Invalid connection request state?")
 
-
     def update_robots(self):
         data = packet.make_packet_from_bytes(self._loc.SerializeToString())
 
@@ -92,7 +93,7 @@ class Scheduler(tornado.tcpserver.TCPServer):
 
     @tornado.gen.coroutine
     def getAllOrders(self):
-        print("getting orders")
+        # fetch orders from the database by sending a get request
         destination = 'http://localhost:8080/scheduler/'
         request = httpclient.HTTPRequest(destination, method="GET")
         response = yield self.http_client.fetch(request)
@@ -100,9 +101,8 @@ class Scheduler(tornado.tcpserver.TCPServer):
         orders = []
         for (id, userId, drinkId, completed, time, robotId, priority) in db_orders:
             robot = None if robotId == -1 else self.robots[robotId]
-
-            orders.append(Order(id, userId, drinkId, completed=completed, time=time, robot=robot, priority=priority))
-
+            orders.append(Order(id, userId, drinkId, completed=completed, 
+                                time=time, robot=robot, priority=priority))
         return orders
 
     def updateAssignedOrders(self, allOrders):
@@ -120,20 +120,18 @@ class Scheduler(tornado.tcpserver.TCPServer):
             robotDistances[robot.id] = robot.getTripDistance(self.barX, self.barY)
         return sorted(robotDistances.keys(), key=lambda robot: robotDistances[robot])
 
-    def distance(x1, y1, x2, y2):
-        return math.sqrt((x1 - x2)**2 + (y1 - y2)**2)
-
+    # sort orders by distance to firstOrder
     def getClosestOrders(self, firstOrder, orders):
         (fx, fy) = firstOrder.getLocation()
         return sorted(orders, key=lambda order: distance(fx, fy, *order.getLocation()))
 
     def assignRestOfOrders(self, robot, uncompletedOrders, finalQueue, robotOrders):
-        remainingOrders = self.getClosestOrders(self, robotOrders[0], uncompletedOrders)
+        remainingOrders = self.getClosestOrders(robotOrders[0], uncompletedOrders)
         remainingOrders = remainingOrders[0 : robot.capacity - len(robotOrders)]
         robotOrders.extend(remainingOrders)
         for assignedOrder in remainingOrders:
             uncompletedOrders.remove(assignedOrder)
-            assignedOrder.robot = robots
+            assignedOrder.robot = robot
             assignedOrder.priority = len(finalQueue)
             finalQueue.append(assignedOrder)
 
@@ -162,7 +160,8 @@ class Scheduler(tornado.tcpserver.TCPServer):
                         firstOrder.priority = len(finalQueue)
                         robotOrders.append(firstOrder)
                         finalQueue.append(firstOrder)
-                    self.assignRestOfOrders(robot, uncompletedOrders, finalQueue, robotOrders)
+                    self.assignRestOfOrders(robot, uncompletedOrders, 
+                                            finalQueue, robotOrders)
                 else:
                     # temporarily assign orders to remaining robots
                     firstOrder = uncompletedOrders.pop(0)
@@ -170,29 +169,29 @@ class Scheduler(tornado.tcpserver.TCPServer):
                     firstOrder.priority = len(finalQueue)
                     finalQueue.append(firstOrder)
                     robotOrders = [firstOrder]
-                    self.assignRestOfOrders(robot, uncompletedOrders, finalQueue, robotOrders)
+                    self.assignRestOfOrders(robot, uncompletedOrders, 
+                                            finalQueue, robotOrders)
             firstPass = False
         return finalQueue
 
+    @tornado.gen.coroutine
     def updateDatabase(self):
-        # insert new priorities, robots
+        # insert new priorities, robots into database by sending post request
         for order in self.orderQueue:
             robotId = -1 if order.robot == None else order.robot.id
-            body = 'robot_id=%s,id=%s,priority=%s' % (robotId, order.id, order.priority)
+            body = 'id=%s&robot_id=%s&priority=%s' % (order.id, robotId, order.priority)
             destination = 'http://localhost:8080/scheduler/'
             request = httpclient.HTTPRequest(destination, body=body, method="POST")
             response = yield self.http_client.fetch(request)
         
-    def updateScheduler(self):
-        print("updating scheduler")
-        allOrders = self.getAllOrders()
-        print(allOrders)
+    async def updateScheduler(self):
+        allOrders = await self.getAllOrders()
         self.updateAssignedOrders(allOrders)
         uncompletedOrders = list(filter(lambda order: not order.completed, allOrders))
         newQueue = self.assignOrders(uncompletedOrders)
         if newQueue != self.orderQueue:
             self.orderQueue = newQueue
-            self.updateDatabase()
+            await self.updateDatabase()
         print(newQueue)
 
 if __name__ == "__main__":
@@ -202,11 +201,7 @@ if __name__ == "__main__":
     scheduler.listen(4242)
     logging.info("Starting scheduler!")
 
-    # print("about to get orders")
-    # ioloop.run_sync(scheduler.updateScheduler)
-    # print("got orders")
-
-    # tornado.ioloop.PeriodicCallback(scheduler.updateScheduler, 1000).start()
+    tornado.ioloop.PeriodicCallback(scheduler.updateScheduler, 1000).start()
     logging.info("Starting robot updater!")
     tornado.ioloop.PeriodicCallback(scheduler.update_robots, 1000).start()
     ioloop.start()

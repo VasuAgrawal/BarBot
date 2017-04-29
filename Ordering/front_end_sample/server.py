@@ -375,6 +375,7 @@ class SchedulerHandler(PostgresHandler):
         id = int(self.get_argument("id"))
         robot_id = int(self.get_argument("robot_id"))
         priority = int(self.get_argument("priority"))
+        print("updating database: %d, %d, %d" % (id, robot_id, priority))
         sql = """
             UPDATE orders
             SET robot_id=%s, priority=%s
@@ -433,10 +434,10 @@ class BatBotApplication(tornado.web.Application):
         }
         tornado.web.Application.__init__(self, handlers, **settings)
 
-        #dsn = 'dbname=template1 user=Kim password=icanswim ' \
+        dsn = 'dbname=template1 user=Kim password=icanswim ' \
+                 'host=localhost port=10601'
+        #dsn = 'dbname=barbotdb user=barbotdev password=icanswim host=localhost port=10601'
         #dsn = 'dbname=template1 user=postgres ' \
-                 #'host=localhost port=10601'
-        dsn = 'dbname=barbotdb user=barbotdev password=icanswim host=localhost port=10601'
 
         self.db = momoko.Pool(dsn=dsn, size=2, ioloop=ioloop)
         self.bartender = [1,2]
