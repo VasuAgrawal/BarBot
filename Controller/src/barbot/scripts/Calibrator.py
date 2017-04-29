@@ -10,6 +10,7 @@ from barbot.msg import Euler
 from geometry_msgs.msg import PointStamped
 
 import numpy as np
+import math
 
 location_deq = collections.deque(maxlen=10)
 imu_deq = collections.deque(maxlen=10)
@@ -21,11 +22,25 @@ pool_plane_origin = np.array([0.0, 0.0, 0.0])
 pool_plane_normal = np.array([0.0, 0.0, 0.0])
 rmat = np.array([[0.0, 0.0, 0.0], [0.0, 0.0, 0.0], [0.0, 0.0, 0.0]])
 
+imu_offset = 0.0
+
 def handle_location(data):
     location_deq.append(data)
 
     # If calibrated, convert this reading into a calibrated one and republish.
     if calibrated:
+        # Project uncalibrated location onto the pool plane
+        # http://stackoverflow.com/questions/9605556/how-to-project-a-3d-point-to-a-3d-plane
+        raw = np.array([data.point.x, data.point.y, data.point.z])
+        v = raw - pool_plane_origin
+        dist = np.dot(v, pool_plane_normal)
+        projected = raw - dist*pool_plane_normal
+
+        # Rotate data from pool plane to XY plane
+        final = rmat.dot(projected)
+
+        # Publish normalized data
+        (data.point.x,data.point.y,data.point.z) = (final[0],final[1],final[2])
         location_pub.publish(data) # Do something better here
 
 
@@ -34,6 +49,7 @@ def handle_imu(data):
     
     # If calibrated, convert this reading into a calibrated one and republish.
     if calibrated:
+        data.heading += imu_offset
         location_pub.publish(data)
 
 
@@ -54,8 +70,8 @@ class CalibrationPoint(object):
 
 
 def handle_user_input():
-    instructions = ("Move the robot to the %s corner, with some fixed" +
-    " orientation relative to the corner. Let the robot sit in place for 10" +
+    instructions = ("Move the robot to the %s corner, pointing towards" +
+    " the right wall. Let the robot sit in place for 10" +
     " seconds before pressing ENTER.")
     
     locations = ["BOTTOM LEFT", "TOP LEFT", "TOP RIGHT", "BOTTOM RIGHT"]
@@ -116,13 +132,36 @@ def handle_user_input():
     pool_plane_origin = [p0.x, p0.y, p0.z]
 
     # Compute normal of the pool plane
-    v1 = p1 - p0
-    v2 = p2 - p0
+    v1 = np.array([p1.x-p0.x, p1.y-p0.y, p1.z-p0.z])
+    v2 = np.array([p2.x-p0.x, p2.y-p0.y, p2.z-p0.z])
     global pool_plane_normal
     pool_plane_normal = np.cross(v1, v2) / np.linalg.norm(np.cross(v1, v2))
 
     # Compute rotation matrix of pool plane from Z axis
+    # http://stackoverflow.com/questions/9423621/3d-rotations-of-a-plane
+    M = pool_plane_normal # Normal vector to pool plane
+    N = np.array([0.0, 0.0, 1.0]) # Normal vector to plane I am rotating to (XY)
+    costheta = np.dot(M, N) / (np.linalg.norm(M) * np.linalg.norm(N))
+    axis = cross(M, N) / np.linalg.norm(np.cross(M, N))
 
+    c = costheta
+    s = math.sqrt(1-c*c)
+    C = 1-c
+    (x, y, z) = (axis[0], axis[1], axis[2])
+
+    global rmat
+    rmat = [[x*x*C+c,   x*y*C-z*s, x*z*C+y*s],
+            [y*x*C+z*s, y*y*C+c,   y*z*C-x*s],
+            [z*x*C-y*s, z*y*C+x*s, z*z*C+c  ]]
+
+    # Compute rotation between GLS frame and pool frame
+    # v2 is from bottom left to bottom right - treat this as x axis
+    v2_norm = np.linalg.norm(v2)
+    frame_offset = math.acos(np.dot(v2_norm, np.array([1.0, 0.0, 0.0])))
+    global imu_offset
+    imu_offset = frame_offset + calibration_points[0].heading # SIGNS HERE!
+
+    rospy.loginfo("IMU offset: %f\n", imu_offset)
 
     global calibrated
     calibrated = True
