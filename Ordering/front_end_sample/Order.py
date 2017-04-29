@@ -17,10 +17,10 @@ class Order(object):
         if self.wristbandId in locationMap:
             customerPoint = locationMap[self.wristbandId]
             # do we need to use z here at all?
-            return (customerPoint.x, customerPoint.y)
+            return (customerPoint.x, customerPoint.y, customerPoint.z)
         else:
             # TODO: what should we do if the wristband doesn't exist?
-            return (0, 0)
+            return (0, 0, 0)
             #raise Exception("Cannot find wristband id %d in location map %r" % (self.wristbandId, locationMap))
 
     def __eq__(self, other):

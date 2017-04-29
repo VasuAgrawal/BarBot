@@ -11,6 +11,7 @@ class Robot(object):
         self.orders = []
         self.inTransit = False
         self.speed = 5
+        self.goal = None
 
     def getLocation(self, locations):
         locationMap = locations.locations
@@ -18,9 +19,10 @@ class Robot(object):
         if self.id in locationMap:
             position = locationMap[self.id]
             # do we need to use z here at all?
-            return (position.x, position.y)
+            return (position.x, position.y, position.z)
         else:
-            raise Exception("Cannot find wristband id %d in location map %r" % (self.id, locationMap))
+            return (0,0,0)
+            #raise Exception("Cannot find wristband id %d in location map %r" % (self.id, locationMap))
 
     def getID(self):
         return self.id
