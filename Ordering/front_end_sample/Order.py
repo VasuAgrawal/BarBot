@@ -19,7 +19,9 @@ class Order(object):
             # do we need to use z here at all?
             return (customerPoint.x, customerPoint.y)
         else:
-            raise Exception("Cannot find wristband id %d in location map %r" % (self.wristbandId, locationMap))
+            # TODO: what should we do if the wristband doesn't exist?
+            return (0, 0)
+            #raise Exception("Cannot find wristband id %d in location map %r" % (self.wristbandId, locationMap))
 
     def __eq__(self, other):
         return isinstance(other, Order) and self.id == other.id

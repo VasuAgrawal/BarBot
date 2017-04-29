@@ -31,10 +31,11 @@ class Scheduler(tornado.tcpserver.TCPServer):
         self.barX = 0
         self.barY = 0
         self.numRobots = 2
-        self.robots = []
+        self.robots = dict()
         for i in range(self.numRobots):
-            #TODO: replace this location with location from GLS
-            self.robots.append(Robot(i, location=(0,0)))
+            #TODO: replace this with actual wristband id
+            robotWristbandId = i
+            self.robots[robotWristbandId] = Robot(robotWristbandId)
         self.orderQueue = []
 
         self._real_robots = []
@@ -105,7 +106,8 @@ class Scheduler(tornado.tcpserver.TCPServer):
         return orders
 
     def updateAssignedOrders(self, allOrders):
-        for robot in self.robots:
+        for robotId in self.robots:
+            robot = self.robots[robotId]
             for assignedOrder in robot.getOrders():
                 for newOrder in allOrders:
                     if newOrder.id == assignedOrder.id:
@@ -115,7 +117,8 @@ class Scheduler(tornado.tcpserver.TCPServer):
     # sort robots by distance remaining in their trip
     def sortRobots(self):
         robotDistances = dict()
-        for robot in self.robots:
+        for robotId in self.robots:
+            robot = self.robots[robotId]
             robotDistances[robot.id] = robot.getTripDistance(self.barX, self.barY)
         return sorted(robotDistances.keys(), key=lambda robot: robotDistances[robot])
 

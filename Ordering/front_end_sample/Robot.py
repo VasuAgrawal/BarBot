@@ -7,20 +7,23 @@ class Robot(object):
 
     def __init__(self, id, location=None, capacity=2):
         self.id = id
-        self.location = location
         self.capacity = capacity
         self.orders = []
         self.inTransit = False
         self.speed = 5
 
-    def getLocation(self):
-        return self.location
+    def getLocation(self, locations):
+        locationMap = locations.locations
+
+        if self.id in locationMap:
+            position = locationMap[self.id]
+            # do we need to use z here at all?
+            return (position.x, position.y)
+        else:
+            raise Exception("Cannot find wristband id %d in location map %r" % (self.id, locationMap))
 
     def getID(self):
         return self.id
-
-    def updateLocation(self, newLocation):
-        self.location = newLocation
 
     def getOrders(self):
         return self.orders
