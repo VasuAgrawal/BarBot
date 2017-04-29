@@ -28,7 +28,7 @@ class Controller(object):
 
     def waypoint_callback(self, data):
         self.running = True
-        self.waypoint = data
+        self.waypoint = data.pose
 
     def state_callback(self, data):
         left = 0.0
@@ -36,31 +36,35 @@ class Controller(object):
         distance2 = 0.0
         theta_error = 0.0
 
+        state = data.pose
+        now = data.header.stamp
+
         if (self.waypoint != None and self.running):
-            distance2 = ((self.waypoint.pose.x-self.state.pose.x)*(self.waypoint.pose.x-self.state.pose.x) + 
-                (self.waypoint.pose.y-self.state.pose.y)*(self.waypoint.pose.y-self.state.pose.y))
+            err_x = self.waypoint.pose.x - state.x
+            err_y = self.waypoint.pose.y - state.y
 
-            if (distance2 > threshold):
-                robot_waypoint_x = self.waypoint.pose.x - self.state.pose.x
-                robot_waypoint_y = self.waypoint.pose.y - self.state.pose.y
-                robot_waypoint_t = math.atan2(robot_waypoint_y, robot_waypoint_x)
+            distance2 = err_x*err_X + err_y*err_y
 
-                theta_error = ((robot_waypoint_t - self.state.pose.theta) + math.pi) % (2*math.pi) - math.pi
+            if (distance2 > self.threshold*self.threshold):
+
+                goal_theta = math.atan2(err_y, err_x)
+                theta_error = ((goal_theta - state.theta) + math.pi) % (2*math.pi) - math.pi
 
                 if(abs(theta_error) > self.theta_threshold):
-                    left = math.copysign(self.turn_speed, error)
-                    right = -math.copysign(self.turn_speed, error)
+                    left = math.copysign(self.turn_speed, theta_error)
+                    right = -math.copysign(self.turn_speed, theta_error)
+
                 else:
-                    self.error += error
+                    self.error += theta_error
 
                     now = rospy.get_time()
                     dt = now-self.last_time
-                    derr = error-self.last_error
+                    derr = theta_error-self.last_error
                     dterm = derr / dt
-                    change = error*self.kp + self.error*self.ki + dterm*self.kd
+                    change = theta_error*self.kp + self.error*self.ki + dterm*self.kd
 
                     self.last_time = now
-                    self.last_error = error
+                    self.last_error = theta_error
 
                     left = self.speed + change
                     right = self.speed - change
@@ -75,12 +79,18 @@ class Controller(object):
             right = 0.
 
 
+        #normalize between 0 and 1
+        max_thrust = max(abs(left), abs(right))
+        if (max_thrust > 1):
+            left = left / max_thrust
+            right = right / max_thrust
+
         msg = Thruster()
         msg.header.stamp = rospy.Time.now()
-        msg.left = 0.
-        msg.right = 0
+        msg.left = left
+        msg.right = right
 
-        print("distance2 is %f, theta_error is %f, thruster left is %f, thruster right is %f" % (distance2, theta_error, msg.left, msg.right))
+        print("distance2 is %f, theta_error is %f, thruster left is %f, thruster right is %f" % (distance2, theta_error, left, right))
         self.thruster_pub.publish(msg)
 
 
