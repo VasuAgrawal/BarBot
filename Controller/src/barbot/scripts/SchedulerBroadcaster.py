@@ -5,8 +5,8 @@ import rospy
 import time
 import struct
 
-from geometry_msgs.msg import PointStamped
-from barbot.msg import State, Thruster
+from geometry_msgs.msg import PointStamped, Pose2D
+from barbot.msg import Thruster
 from positions_pb2 import Point
 from positions_pb2 import Locations
 from positions_pb2 import ConnectionRequest
@@ -33,6 +33,7 @@ class Broadcaster(object):
         self._port = port
         self._location_pub = rospy.Publisher("raw_location", 
                 PointStamped, queue_size=1)
+        self._waypoint_pub = rospy.Publisher("waypoint", Pose, queue_size=1)
         self._sock = None
 
 
