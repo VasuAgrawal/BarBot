@@ -55,7 +55,7 @@
 #endif
 
 // Inter-ranging delay period, in milliseconds.
-#define RNG_DELAY_MS 10
+#define RNG_DELAY_MS 20
 
 // Default antenna delay values for 64 MHz PRF.
 #define TX_ANT_DLY 16436
@@ -91,7 +91,7 @@
 // Frame delays
 #define POLL_TX_TO_RESP_RX_DLY_UUS 150
 #define RESP_RX_TO_FINAL_TX_DLY_UUS 8000
-#define RESP_RX_TIMEOUT_UUS 11000
+#define RESP_RX_TIMEOUT_UUS 10000
 #define TDMA_DELAY 10
 
 // Distance regression information
@@ -162,7 +162,7 @@ static int rounds;
 
 // Server information
 static int serverfd;
-static std::string serverip = "192.168.1.109";
+static std::string serverip = "192.168.1.108";
 static std::string serverport = "8888";
 
 // Function Declarations
@@ -241,6 +241,8 @@ int main(int argc, char *argv[]) {
     INFO_PRINT(("Beacon: Connected to server\n"));
 #endif // USING_SERVER
 
+    mode = TRACKING;
+
     // Loop forever acting as a beacon
     while (1) {
         if (mode == INITIALIZATION) {
@@ -249,7 +251,7 @@ int main(int argc, char *argv[]) {
         }
         else if (mode == TRACKING) {
             INFO_PRINT(("Entered tracking mode\n"));
-            deca_sleep(500 * (device_addr - NUM_BEACONS));
+            deca_sleep(RNG_DELAY_MS * (device_addr - NUM_BEACONS));
             while(1) {
                 // Regularly ping the beacon network
                 for (uint8 target_addr = 0; target_addr < NUM_BEACONS; target_addr++) {
