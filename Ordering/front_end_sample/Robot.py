@@ -7,25 +7,28 @@ class Robot(object):
 
     def __init__(self, id, location=None, capacity=2):
         self.id = id
-        self.location = location
         self.capacity = capacity
         self.orders = []
         self.inTransit = False
         self.speed = 5
 
-    def getLocation(self):
-        return self.location
+    def getLocation(self, locations):
+        locationMap = locations.locations
+
+        if self.id in locationMap:
+            position = locationMap[self.id]
+            # do we need to use z here at all?
+            return (position.x, position.y)
+        else:
+            raise Exception("Cannot find wristband id %d in location map %r" % (self.id, locationMap))
 
     def getID(self):
         return self.id
 
-    def updateLocation(self, newLocation):
-        self.location = newLocation
-
     def getOrders(self):
         return self.orders
 
-    def getTripDistance(self, data):
+    def getTripDistance(self, barX, barY):
         if not self.inTransit:
             return 0
         else:
@@ -33,10 +36,10 @@ class Robot(object):
             (currX, currY) = self.getLocation()
             totalDist = 0
             for order in self.getOrders():
-                (orderX, orderY) = order.getLocation(data)
+                (orderX, orderY) = order.getLocation()
                 totalDist += distance(currX, currY, orderX, orderY)
                 (currX, currY) = (orderX, orderY)
-            totalDist += distance(currX, currY, data.barX, data.barY)
+            totalDist += distance(currX, currY, barX, barY)
             return totalDist
 
     def move(self, destX, destY):

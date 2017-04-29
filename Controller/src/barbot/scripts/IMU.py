@@ -21,13 +21,19 @@ class IMU(object):
         rospy.init_node(name)
         rate = rospy.Rate(10)
 
-        eulerPub = rospy.Publisher(topic_name+'/Euler', Euler)
-        quatPub = rospy.Publisher(topic_name+'/Quaternion', Quaternion)
-        magPub = rospy.Publisher(topic_name+'/Magnetometer', Vector3)
-        gyroPub = rospy.Publisher(topic_name+'/Gyroscope', Vector3)
-        accelPub = rospy.Publisher(topic_name+'/Accelerometer', Vector3)
-        linearPub = rospy.Publisher(topic_name+'/LinearAcceleration', Vector3)
-        gravityPub = rospy.Publisher(topic_name+'/GravityAcceleration', Vector3)
+        eulerPub = rospy.Publisher(topic_name+'/Euler', Euler, queue_size=1)
+        quatPub = rospy.Publisher(topic_name+'/Quaternion', Quaternion,
+                queue_size=1)
+        magPub = rospy.Publisher(topic_name+'/Magnetometer', Vector3,
+                queue_size=1)
+        gyroPub = rospy.Publisher(topic_name+'/Gyroscope', Vector3,
+                queue_size=1)
+        accelPub = rospy.Publisher(topic_name+'/Accelerometer', Vector3,
+                queue_size=1)
+        linearPub = rospy.Publisher(topic_name+'/LinearAcceleration', Vector3,
+                queue_size=1)
+        gravityPub = rospy.Publisher(topic_name+'/GravityAcceleration', Vector3,
+                queue_size=1)
 
         while not rospy.is_shutdown():
             eulerPub.publish(self.getEuler())

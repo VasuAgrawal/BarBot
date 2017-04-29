@@ -8,6 +8,7 @@ message Point {
 
 message Locations {
     map<uint32, Point> locations = 1;
+    Point waypoint = 2;
 }
 
 message ConnectionRequest {

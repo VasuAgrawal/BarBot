@@ -51,8 +51,9 @@ find_package(catkin REQUIRED COMPONENTS
 add_message_files(
   FILES
   Thruster.msg
-  State.msg
+  Location.msg
   Euler.msg
+  Mode.msg
 )
 
 ## Generate services in the 'srv' folder

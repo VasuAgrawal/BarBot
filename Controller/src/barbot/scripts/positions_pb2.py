@@ -19,7 +19,7 @@ DESCRIPTOR = _descriptor.FileDescriptor(
   name='positions.proto',
   package='',
   syntax='proto3',
-  serialized_pb=_b('\n\x0fpositions.proto\"(\n\x05Point\x12\t\n\x01x\x18\x01 \x01(\x01\x12\t\n\x01y\x18\x02 \x01(\x01\x12\t\n\x01z\x18\x03 \x01(\x01\"s\n\tLocations\x12,\n\tlocations\x18\x01 \x03(\x0b\x32\x19.Locations.LocationsEntry\x1a\x38\n\x0eLocationsEntry\x12\x0b\n\x03key\x18\x01 \x01(\r\x12\x15\n\x05value\x18\x02 \x01(\x0b\x32\x06.Point:\x02\x38\x01\"j\n\x11\x43onnectionRequest\x12/\n\x04type\x18\x01 \x01(\x0e\x32!.ConnectionRequest.ConnectionType\"$\n\x0e\x43onnectionType\x12\x07\n\x03GLS\x10\x00\x12\t\n\x05ROBOT\x10\x01\x62\x06proto3')
+  serialized_pb=_b('\n\x0fpositions.proto\"(\n\x05Point\x12\t\n\x01x\x18\x01 \x01(\x01\x12\t\n\x01y\x18\x02 \x01(\x01\x12\t\n\x01z\x18\x03 \x01(\x01\"\x8d\x01\n\tLocations\x12,\n\tlocations\x18\x01 \x03(\x0b\x32\x19.Locations.LocationsEntry\x12\x18\n\x08waypoint\x18\x02 \x01(\x0b\x32\x06.Point\x1a\x38\n\x0eLocationsEntry\x12\x0b\n\x03key\x18\x01 \x01(\r\x12\x15\n\x05value\x18\x02 \x01(\x0b\x32\x06.Point:\x02\x38\x01\"j\n\x11\x43onnectionRequest\x12/\n\x04type\x18\x01 \x01(\x0e\x32!.ConnectionRequest.ConnectionType\"$\n\x0e\x43onnectionType\x12\x07\n\x03GLS\x10\x00\x12\t\n\x05ROBOT\x10\x01\x62\x06proto3')
 )
 _sym_db.RegisterFileDescriptor(DESCRIPTOR)
 
@@ -42,8 +42,8 @@ _CONNECTIONREQUEST_CONNECTIONTYPE = _descriptor.EnumDescriptor(
   ],
   containing_type=None,
   options=None,
-  serialized_start=248,
-  serialized_end=284,
+  serialized_start=275,
+  serialized_end=311,
 )
 _sym_db.RegisterEnumDescriptor(_CONNECTIONREQUEST_CONNECTIONTYPE)
 
@@ -126,8 +126,8 @@ _LOCATIONS_LOCATIONSENTRY = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=120,
-  serialized_end=176,
+  serialized_start=147,
+  serialized_end=203,
 )
 
 _LOCATIONS = _descriptor.Descriptor(
@@ -144,6 +144,13 @@ _LOCATIONS = _descriptor.Descriptor(
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       options=None),
+    _descriptor.FieldDescriptor(
+      name='waypoint', full_name='Locations.waypoint', index=1,
+      number=2, type=11, cpp_type=10, label=1,
+      has_default_value=False, default_value=None,
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      options=None),
   ],
   extensions=[
   ],
@@ -156,8 +163,8 @@ _LOCATIONS = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=61,
-  serialized_end=176,
+  serialized_start=62,
+  serialized_end=203,
 )
 
 
@@ -188,13 +195,14 @@ _CONNECTIONREQUEST = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=178,
-  serialized_end=284,
+  serialized_start=205,
+  serialized_end=311,
 )
 
 _LOCATIONS_LOCATIONSENTRY.fields_by_name['value'].message_type = _POINT
 _LOCATIONS_LOCATIONSENTRY.containing_type = _LOCATIONS
 _LOCATIONS.fields_by_name['locations'].message_type = _LOCATIONS_LOCATIONSENTRY
+_LOCATIONS.fields_by_name['waypoint'].message_type = _POINT
 _CONNECTIONREQUEST.fields_by_name['type'].enum_type = _CONNECTIONREQUEST_CONNECTIONTYPE
 _CONNECTIONREQUEST_CONNECTIONTYPE.containing_type = _CONNECTIONREQUEST
 DESCRIPTOR.message_types_by_name['Point'] = _POINT

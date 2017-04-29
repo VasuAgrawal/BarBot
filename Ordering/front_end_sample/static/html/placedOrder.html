@@ -1,0 +1,16 @@
+<form action="/v0/cancel/" method="post">
+    <input type="hidden" name="orderId" value="{{ order.id }}"/>
+    <tr class="order" id="m{{ order.id }}">
+      <td class="mdl-data-table__cell--non-numeric">{% module linkify(str(order.time)) %}</td>
+      <td class="mdl-data-table__cell--non-numeric">{% module linkify(order.drinkType) %}</td>
+        {% if not order.completed %}
+          <td>
+          <button class="mdl-button mdl-js-button mdl-button--raised mdl-js-ripple-effect mdl-button--accent" type="submit">
+            Cancel
+          </button>
+          </td>
+        {% else %}
+          <td class="mdl-data-table__cell--non-numeric">Order is on its way!</td>
+        {% end %}
+    </tr>
+</form>

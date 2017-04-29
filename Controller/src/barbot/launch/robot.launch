@@ -1,0 +1,7 @@
+<launch>
+    <node name="MotorDriver" pkg="barbot" type="MotorDriver.py" />
+    <node name="TeleopServer" pkg="barbot" type="TeleopServer.py" />
+    <node name="SchedulerBroadcaster" pkg="barbot" 
+        type="SchedulerBroadcaster.py" />
+    <node name="IMU" pkg="barbot" type="IMU.py" />
+</launch>

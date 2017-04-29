@@ -79,13 +79,13 @@ class RegisterHandler(PostgresHandler):
         name = str(self.get_argument("Name"))
         email = str(self.get_argument("Email"))
         password = str(self.get_argument("Password"))
-        wristbandID = str(self.get_argument("WristbandID"))
-        if(len(name) > 0 and len(email) > 0 and len(password) > 0 and len(wristbandID) > 0):
+        wristband_id = str(self.get_argument("WristbandID"))
+        if(len(name) > 0 and len(email) > 0 and len(password) > 0 and wristband_id.isdigit()):
             sql = """
-                    INSERT INTO users(name, email, password, wristbandID)
+                    INSERT INTO users(name, email, password, wristband_id)
                     VALUES(%s, %s, %s, %s)
                 """
-            cursor = yield self.db().execute(sql, (name, email,password,wristbandID))
+            cursor = yield self.db().execute(sql, (name, email,password,int(wristband_id)))
             self.redirect("/")
         else:
             self.write("Register Fail")
@@ -101,7 +101,6 @@ class LogoutHandler(PostgresHandler):
 class AboutHandler(PostgresHandler):
     def get(self):
         self.render("static/html/about.html")
-
 
 class CustomerHandler(PostgresHandler):
     @tornado.web.authenticated # Example of authentication
@@ -119,7 +118,23 @@ class CustomerHandler(PostgresHandler):
         for item in result:
             drink = Drink(item['id'], item['name'], item['price'])
             drinks.append(drink)
-        self.render("static/html/customer.html", drinks=drinks)
+
+        # get customer's current orders
+        sql = """
+            SELECT id, drink_id, completed, time
+            FROM orders
+            WHERE user_id=%s
+        """
+        cursor = yield self.db().execute(sql, (self.get_current_user(),))
+        result = cursor.fetchall()
+        currentOrders = []
+        for (id, drink_id, completed, time) in result:
+            drink_name = ""
+            for drink in drinks:
+                if drink_id == drink.id: drink_name = drink.type
+            currentOrders.append(Order(id=id, drinkType=drink_name, completed=completed, time=time))
+        
+        self.render("static/html/customer.html", drinks=drinks, orders=currentOrders)
 
 class MenuHandler(PostgresHandler):
     @tornado.web.authenticated
@@ -148,7 +163,6 @@ class MenuHandler(PostgresHandler):
                 cursor = yield self.db().execute(sql, (drinkType, price))
                 self.redirect("/")
 
-
 class BartenderHandler(PostgresHandler):
     @tornado.gen.coroutine
     def get(self):
@@ -172,7 +186,7 @@ class BartenderHandler(PostgresHandler):
                 drinks.append(drink)
 
             order_sql = """
-                    SELECT id, user_id, drink_id, completed, time, robot_id, priority
+                    SELECT id, wristband_id, drink_id, completed, time, robot_id, priority
                     FROM orders
                     WHERE completed = FALSE
                     ORDER BY priority
@@ -187,7 +201,7 @@ class BartenderHandler(PostgresHandler):
                 for drink in drinks:
                     if(drink.id == drinkId):
                         drinkName = drink.type
-                order = Order(item['id'], item['user_id'], drinkId, drinkName, item['completed'], item['time'], item['robot_id'])
+                order = Order(item['id'], item['wristband_id'], drinkName, item['completed'], item['time'], item['robot_id'])
                 orders.append(order)
             self.render("static/html/bartender.html", orders=orders, drinks=drinks)
 
@@ -203,55 +217,50 @@ class BartenderHandler(PostgresHandler):
                 WHERE id=%s;
             """
             cursor = yield self.db().execute(sql, (id, ))
-            
-            sql = """ SELECT  id, user_id, drink_id, completed, time, robot_id, priority
-                      FROM orders
-                  """
-            c = yield self.db().execute(sql)
-            print(c.fetchall())
-
         self.redirect("/")
 
-
-
-class ApiDrinkHandler(PostgresHandler):
-    def get(self):
-        print(self.get_argument("id", default=None))
-        self.write(json.dumps({"drink1": "beer"}))
-
+# cancel an order
+class ApiCancelHandler(PostgresHandler):
+    @tornado.web.authenticated
+    @tornado.gen.coroutine
     def post(self):
-        print(self.get_argument("id"))
+        order_id = self.get_argument("orderId", default = None)
+        if order_id:
+            sql = """
+                DELETE FROM orders where id=%s
+            """
+            print("canceling order %s" % order_id)
+            cursor = yield self.db().execute(sql, (order_id,))
+        self.redirect("/customer")
 
-
+# Insert an order into the database
 class ApiOrderHandler(PostgresHandler):
     @tornado.web.authenticated
     @tornado.gen.coroutine
     def post(self):
         drink_id = self.get_argument("drinkId", default = None)
         if(drink_id):
+            # get wristband_id associated with this user
+            user_id = self.get_current_user()
+            wristband_sql = """
+                SELECT wristband_id
+                FROM users
+                WHERE id=%s
+            """
+            wristband_cursor = yield self.db().execute(wristband_sql, (user_id,))
+            wristband_id = wristband_cursor.fetchall()[0]
+
             dt = datetime.now()
-            print(dt)
             drink_id = int(drink_id)
             sql ="""
-                INSERT INTO orders(user_id, drink_id, completed, time, robot_id, priority)
-                VALUES (%s, %s, FALSE, %s, %s, %s)
+                INSERT INTO orders(user_id, wristband_id, drink_id, completed, time, robot_id, priority)
+                VALUES (%s, %s, %s, FALSE, %s, %s, %s)
                 """
-            order_cursor = yield self.db().execute(sql, (self.get_current_user(), drink_id, dt, "-1", 1000))
-            self.redirect("/about/")
+            order_cursor = yield self.db().execute(sql, (user_id, wristband_id, drink_id, dt, "-1", 1000))
+            self.redirect("/customer")
         else:
             self.write("Order Failed!")
             self.finish()
-
-
-class ApiRobotHandler(PostgresHandler):
-    def get(self):
-        self.write(json.dumps({"robot": "robot data!"}))
-
-
-class ApiCustomerHandler(PostgresHandler):
-    def get(self):
-        self.write(json.dumps({"customer": "customer data"}))
-
 
 #Keeping init scripts here, may not be a great idea
 class SetUpHandler(PostgresHandler):
@@ -266,7 +275,7 @@ class SetUpHandler(PostgresHandler):
                     name  varchar(80),
                     email  varchar(80) UNIQUE,
                     password  varchar(80),
-                    wristbandID integer
+                    wristband_id integer
                 );
                 ALTER SEQUENCE user_id OWNED BY users.id;
             """
@@ -291,6 +300,7 @@ class SetUpHandler(PostgresHandler):
                     id integer PRIMARY KEY DEFAULT nextval('order_id'),
                     user_id integer REFERENCES users(id) ON UPDATE CASCADE ON DELETE CASCADE,
                     drink_id integer REFERENCES drinks(id) ON UPDATE CASCADE ON DELETE CASCADE,
+                    wristband_id integer,
                     completed boolean DEFAULT FALSE,
                     time timestamp,
                     robot_id integer DEFAULT -1,
@@ -308,61 +318,22 @@ class ResetHandler(PostgresHandler):
     @tornado.web.authenticated
     def get(self):
         print("reseting")
-        # USER TABLE INIT
-        user_sql = """
-                CREATE SEQUENCE IF NOT EXISTS user_id;
-                CREATE TABLE IF NOT EXISTS users (
-                    id integer PRIMARY KEY DEFAULT nextval('user_id') ,
-                    name  varchar(80),
-                    email  varchar(80) UNIQUE,
-                    password  varchar(80),
-                    wristbandID integer
-                );
-                ALTER SEQUENCE user_id OWNED BY users.id;
-            """
-        user_cursor = yield self.db().execute(user_sql)
+        delete_sql = """
+            DROP SEQUENCE IF EXISTS user_id CASCADE;
+            DROP TABLE IF EXISTS users CASCADE;
+            DROP TABLE IF EXISTS drinks CASCADE;
+            DROP TABLE IF EXISTS orders CASCADE;
+        """
 
+        delete_cursor = yield self.db().execute(delete_sql)
 
-        # DRINKS MENU INIT
-        drink_sql = """
-                CREATE SEQUENCE IF NOT EXISTS drink_id;
-                CREATE TABLE IF NOT EXISTS drinks (
-                    id integer PRIMARY KEY DEFAULT nextval('drink_id') ,
-                    name  varchar(80) UNIQUE,
-                    price real 
-                );
-                ALTER SEQUENCE drink_id OWNED BY drinks.id;
-            """
-        drink_cursor = yield self.db().execute(drink_sql)
-
-        # ORDERS INIT
-        sql = "DROP TABLE orders;"
-        cursor = yield self.db().execute(sql)
-
-        order_sql = """
-                CREATE SEQUENCE IF NOT EXISTS order_id;
-                CREATE TABLE IF NOT EXISTS orders (
-                    id integer PRIMARY KEY DEFAULT nextval('order_id'),
-                    user_id integer REFERENCES users(id) ON UPDATE CASCADE ON DELETE CASCADE,
-                    drink_id integer REFERENCES drinks(id) ON UPDATE CASCADE ON DELETE CASCADE,
-                    completed boolean DEFAULT FALSE,
-                    time timestamp,
-                    robot_id integer DEFAULT -1,
-                    priority integer
-                );
-                ALTER SEQUENCE order_id OWNED BY orders.id;
-            """
-        order_cursor = yield self.db().execute(order_sql)
-
-
-        self.write("DONE\n")
-        self.finish()
-
+        self.redirect("/setup")
+        
 class SchedulerHandler(PostgresHandler):
     @tornado.gen.coroutine
     def get(self):
         order_sql = """
-            SELECT id, user_id, drink_id, completed, time, robot_id, priority
+            SELECT id, wristband_id, drink_id, completed, time, robot_id, priority
             FROM orders
             ORDER BY time
         """
@@ -377,6 +348,7 @@ class SchedulerHandler(PostgresHandler):
         id = int(self.get_argument("id"))
         robot_id = int(self.get_argument("robot_id"))
         priority = int(self.get_argument("priority"))
+        print("updating database: %d, %d, %d" % (id, robot_id, priority))
         sql = """
             UPDATE orders
             SET robot_id=%s, priority=%s
@@ -400,9 +372,7 @@ class SchedulerHandler(PostgresHandler):
         self.write("Done!\n")
         self.finish()
         
-
-        
-class BatBotApplication(tornado.web.Application):
+class BarBotApplication(tornado.web.Application):
     def __init__(self, ioloop):
         logging.info("Starting logging!")
         logging.root.setLevel(logging.DEBUG)
@@ -415,15 +385,13 @@ class BatBotApplication(tornado.web.Application):
             (r"/customer/?", CustomerHandler),
             (r"/bartender/?", BartenderHandler),
             (r"/menu/?", MenuHandler),
-            (r"/v0/drink/", ApiDrinkHandler),
+            (r"/v0/cancel/", ApiCancelHandler),
             (r"/v0/order/", ApiOrderHandler),
-            (r"/v0/robot/", ApiRobotHandler),
-            (r"/v0/customer/", ApiCustomerHandler),
             (r"/scheduler/", SchedulerHandler),
             (r"/login/?", LoginHandler),
             (r"/register/?", RegisterHandler),
             (r"/about/?", AboutHandler),
-            (r"/logout/?", LogoutHandler),
+            (r"/logout/?", LogoutHandler)
         ]
 
         settings = {
@@ -435,11 +403,10 @@ class BatBotApplication(tornado.web.Application):
         }
         tornado.web.Application.__init__(self, handlers, **settings)
 
-        #dsn = 'dbname=template1 user=Kim password=icanswim ' \
-        dsn = 'dbname=template1 user=postgres ' \
+        dsn = 'dbname=template1 user=Kim password=icanswim ' \
                  'host=localhost port=10601'
-        # dsn = 'dbname=barbotdb user=barbotdev password=icanswim ' \
-                  # 'host=localhost port=10601'
+        #dsn = 'dbname=barbotdb user=barbotdev password=icanswim host=localhost port=10601'
+        #dsn = 'dbname=template1 user=postgres ' \
 
         self.db = momoko.Pool(dsn=dsn, size=2, ioloop=ioloop)
         self.bartender = [1,2]
@@ -447,7 +414,7 @@ class BatBotApplication(tornado.web.Application):
 
 def main():
     ioloop = tornado.ioloop.IOLoop.instance()
-    app = BatBotApplication(ioloop)
+    app = BarBotApplication(ioloop)
     
     dbConnection = app.db.connect()
     ioloop.add_future(dbConnection, lambda f: ioloop.stop())
