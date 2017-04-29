@@ -9,6 +9,7 @@ import rospy
 from barbot.msg import Euler
 from geometry_msgs.msg import PointStamped
 
+import numpy as np
 
 location_deq = collections.deque(maxlen=10)
 imu_deq = collections.deque(maxlen=10)
@@ -16,6 +17,9 @@ imu_deq = collections.deque(maxlen=10)
 calibration_points = []
 calibrated = False
 
+pool_plane_origin = np.array([0.0, 0.0, 0.0])
+pool_plane_normal = np.array([0.0, 0.0, 0.0])
+rmat = np.array([[0.0, 0.0, 0.0], [0.0, 0.0, 0.0], [0.0, 0.0, 0.0]])
 
 def handle_location(data):
     location_deq.append(data)
@@ -100,6 +104,24 @@ def handle_user_input():
                 avg_pitch, avg_heading)
         calibration_points.append(CalibrationPoint(avg_x, avg_y, avg_z,
             avg_roll, avg_pitch, avg_heading))
+
+    # Compute information about the pool plane from calibration data
+    # Use bottom left, top left, bottom right
+    CalibrationPoint p0 = calibration_points[0]
+    CalibrationPoint p1 = calibration_points[1]
+    CalibrationPoint p2 = calibration_points[3]
+
+    # Use bottom left calibration point as origin of pool plane
+    global pool_plane_origin
+    pool_plane_origin = [p0.x, p0.y, p0.z]
+
+    # Compute normal of the pool plane
+    v1 = p1 - p0
+    v2 = p2 - p0
+    global pool_plane_normal
+    pool_plane_normal = np.cross(v1, v2) / np.linalg.norm(np.cross(v1, v2))
+
+    # Compute rotation matrix of pool plane from Z axis
 
 
     global calibrated
