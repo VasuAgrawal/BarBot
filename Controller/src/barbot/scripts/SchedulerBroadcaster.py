@@ -35,6 +35,7 @@ class Broadcaster(object):
                 PointStamped, queue_size=1)
         self._waypoint_pub = rospy.Publisher("waypoint", Pose, queue_size=1)
         self._sock = None
+        rospb.loginfo("Broadcaster initialized\n");
 
 
     def _connect(self):

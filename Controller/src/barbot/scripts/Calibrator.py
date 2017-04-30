@@ -123,9 +123,9 @@ def handle_user_input():
 
     # Compute information about the pool plane from calibration data
     # Use bottom left, top left, bottom right
-    CalibrationPoint p0 = calibration_points[0]
-    CalibrationPoint p1 = calibration_points[1]
-    CalibrationPoint p2 = calibration_points[3]
+    p0 = calibration_points[0]
+    p1 = calibration_points[1]
+    p2 = calibration_points[3]
 
     # Use bottom left calibration point as origin of pool plane
     global pool_plane_origin
@@ -142,7 +142,7 @@ def handle_user_input():
     M = pool_plane_normal # Normal vector to pool plane
     N = np.array([0.0, 0.0, 1.0]) # Normal vector to plane I am rotating to (XY)
     costheta = np.dot(M, N) / (np.linalg.norm(M) * np.linalg.norm(N))
-    axis = cross(M, N) / np.linalg.norm(np.cross(M, N))
+    axis = np.cross(M, N) / np.linalg.norm(np.cross(M, N))
 
     c = costheta
     s = math.sqrt(1-c*c)
@@ -157,7 +157,7 @@ def handle_user_input():
     # Compute rotation between GLS frame and pool frame
     # v2 is from bottom left to bottom right - treat this as x axis
     v2_norm = np.linalg.norm(v2)
-    frame_offset = math.acos(np.dot(v2_norm, np.array([1.0, 0.0, 0.0])))
+    frame_offset = math.acos(np.dot(v2, np.array([1.0, 0.0, 0.0])) / (v2_norm))
     global imu_offset
     imu_offset = frame_offset + calibration_points[0].heading # SIGNS HERE!
 

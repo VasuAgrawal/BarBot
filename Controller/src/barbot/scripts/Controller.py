@@ -26,6 +26,8 @@ class Controller(object):
         rospy.Subscriber(state_topic, Location, self.state_callback)
         rospy.Subscriber(waypoint_topic, Location, self.waypoint_callback)
 
+        rospy.loginfo("Controller initialized");
+
     def waypoint_callback(self, data):
         self.running = True
         self.waypoint = data.pose

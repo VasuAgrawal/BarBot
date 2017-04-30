@@ -100,12 +100,32 @@ class DW(object):
         if self.beacon:
             self.pos = self._pos
         else:
-            # Calculate a new position based on time. For now, wristbands will
-            # sweep a 1m radius circle in the XY plane.
-            angle = 2 * math.pi * (time % self.period) / self.period
-            y = math.sin(angle)
-            x = math.cos(angle)
-            self.pos = self._pos + [x, y, 0]
+            if (self.tag == 7):
+                # The robot, move it in a square around the pool
+                # This is to simulate calibration
+                if ((time % 200) == 0):
+                    # Move the robot to the initial corner
+                    self.pos = np.array([2, 2, 3.1], dtype=np.double);
+                    logging.debug("Robot in bottom left")
+                if ((time % 200) == 50):
+                    # Move the robot to the second corner
+                    self.pos = np.array([2, 22, 3.1], dtype=np.double)
+                    logging.debug("Robot in top left")
+                elif ((time % 200) == 100):
+                    # Move the robot to the third corner
+                    self.pos = np.array([22, 22, 3.1], dtype=np.double)
+                    logging.debug("Robot in top right")
+                elif ((time % 200) == 150):
+                    # Move the robot to the fourth corner
+                    self.pos = np.array([22, 2, 3.1], dtype=np.double)
+                    logging.debug("Robot in bottom right")
+            else:
+                # Calculate a new position based on time. For now, wristbands will
+                # sweep a 1m radius circle in the XY plane.
+                angle = 2 * math.pi * (time % self.period) / self.period
+                y = math.sin(angle)
+                x = math.cos(angle)
+                self.pos = self._pos + [x, y, 0]
 
         # Determine whether or not to provide a measurement update, providing
         # that update if yes.
@@ -205,7 +225,7 @@ class GLS(object):
         
         # self.ax.line(*beacon_points)
         plt.draw()
-        plt.pause(1)
+        plt.pause(0.1)
         # plt.show(False)
 
     
@@ -278,13 +298,13 @@ class GLS(object):
 def main():
     np.random.seed(1)
     logging.root.setLevel(logging.DEBUG)
-    gls = GLS(beacons=8, wristbands = 4)
+    gls = GLS(beacons=7, wristbands = 4)
     # threading.Thread(target=gls.display).start()
     while True:
         gls.step()
         gls.send_updates()
         gls.display()
-        # time.sleep(1)
+        #time.sleep(1)
 
 
 if __name__ == "__main__":
