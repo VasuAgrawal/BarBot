@@ -345,32 +345,31 @@ class SchedulerHandler(PostgresHandler):
     
     @tornado.gen.coroutine
     def post(self):
-        id = int(self.get_argument("id"))
-        robot_id = int(self.get_argument("robot_id"))
-        priority = int(self.get_argument("priority"))
-        print("updating database: %d, %d, %d" % (id, robot_id, priority))
-        sql = """
-            UPDATE orders
-            SET robot_id=%s, priority=%s
-            WHERE id=%s
-        """
+        command = str(self.get_argument("command"))
+        print(command)
+        if command == "update":
+            id = int(self.get_argument("id"))
+            robot_id = int(self.get_argument("robot_id"))
+            priority = int(self.get_argument("priority"))
+            print("updating database: %d, %d, %d" % (id, robot_id, priority))
+            sql = """
+                UPDATE orders
+                SET robot_id=%s, priority=%s
+                WHERE id=%s
+            """
+            order_cursor = yield self.db().execute(sql, (robot_id, priority, id))
 
-        order_cursor = yield self.db().execute(sql, (robot_id, priority, id))
-
-        self.write("Done!\n")
-        self.finish()
-
-    @tornado.gen.coroutine
-    def delete(self):
-        id = int(self.get_argument("id"))
-        sql = """
-            DELETE FROM orders WHERE id = %s;
-        """
-
-        order_cursor = yield self.db().execute(sql, (id, ))
+        elif command == "delete":
+            print("deleting order")
+            id = int(self.get_argument("id"))
+            sql = """
+                DELETE FROM orders WHERE id = %s;
+            """
+            order_cursor = yield self.db().execute(sql, (id, ))
 
         self.write("Done!\n")
         self.finish()
+
         
 class BarBotApplication(tornado.web.Application):
     def __init__(self, ioloop):
@@ -403,9 +402,9 @@ class BarBotApplication(tornado.web.Application):
         }
         tornado.web.Application.__init__(self, handlers, **settings)
 
-        #dsn = 'dbname=template1 user=Kim password=icanswim ' \
-        #         'host=localhost port=10601'
-        dsn = 'dbname=barbotdb user=barbotdev password=icanswim host=localhost port=10601'
+        dsn = 'dbname=template1 user=Kim password=icanswim ' \
+                 'host=localhost port=10601'
+        #dsn = 'dbname=barbotdb user=barbotdev password=icanswim host=localhost port=10601'
         #dsn = 'dbname=template1 user=postgres ' \
 
         self.db = momoko.Pool(dsn=dsn, size=2, ioloop=ioloop)

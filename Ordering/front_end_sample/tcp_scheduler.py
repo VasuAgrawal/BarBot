@@ -41,7 +41,7 @@ class Scheduler(tornado.tcpserver.TCPServer):
         self.robots = dict()
         for i in range(self.numRobots):
             # TODO: replace this with actual wristband id
-            robotWristbandId = i
+            robotWristbandId = i + 7
             self.robots[robotWristbandId] = Robot(robotWristbandId)
         self.orderQueue = []
 
@@ -133,7 +133,7 @@ class Scheduler(tornado.tcpserver.TCPServer):
         robotDistances = dict()
         for robotId in self.robots:
             robot = self.robots[robotId]
-            robotDistances[robot.id] = robot.getTripDistance(self.barX, self.barY)
+            robotDistances[robot.id] = robot.getTripDistance(self.barX, self.barY, self._loc)
         return sorted(robotDistances.keys(), key=lambda robot: robotDistances[robot])
 
     # sort orders by distance to firstOrder
@@ -195,7 +195,7 @@ class Scheduler(tornado.tcpserver.TCPServer):
         # insert new priorities, robots into database by sending post request
         for order in self.orderQueue:
             robotId = -1 if order.robot == None else order.robot.id
-            body = 'id=%s&robot_id=%s&priority=%s' % (order.id, robotId, order.priority)
+            body = 'command=update&id=%s&robot_id=%s&priority=%s' % (order.id, robotId, order.priority)
             request = httpclient.HTTPRequest(self.destination, body=body, method="POST")
             response = yield self.http_client.fetch(request)
        
@@ -204,13 +204,14 @@ class Scheduler(tornado.tcpserver.TCPServer):
         (robotX, robotY, robotZ) = robot.getLocation(self._loc)
         return distance(robotX, robotY, destX, destY) <= self.thresh
 
+    @tornado.gen.coroutine
     def deleteOrder(self, order):
-        body = 'id=%s'
-        request = httpclient.HTTPRequest(self.destination, body=body, method="DELETE")
+        body = 'command=delete,id=%s' % order.id
+        request = httpclient.HTTPRequest(self.destination, body=body, method="POST")
         response = yield self.http_client.fetch(request)
+        print("order deleted")
 
-    @tornado.gen.coroutine 
-    def setRobotGoals(self):
+    async def setRobotGoals(self):
         for robotId in self.robots:
             robot = self.robots[robotId]
             robotOrders = robot.getOrders()
@@ -223,7 +224,8 @@ class Scheduler(tornado.tcpserver.TCPServer):
                     (tX, tY, tZ) = targetOrder.getLocation(self._loc)
                     robot.goal = (tX, tY, tZ)
                     if self.intersects(robot, tX, tY):
-                        self.deleteOrder(targetOrder)
+                        print("deleting order %d" % targetOrder.id)
+                        await self.deleteOrder(targetOrder)
                         robotOrders.pop(0)
                 else: # go back to the bar and refill
                     if self.intersects(robot, self.barX, self.barY):
@@ -231,6 +233,7 @@ class Scheduler(tornado.tcpserver.TCPServer):
                         robot.goal = None
                     else:
                         robot.goal = (self.barX, self.barY, self.barZ)
+                print(robot.goal)
 
     async def updateScheduler(self):
         allOrders = await self.getAllOrders()
@@ -241,7 +244,7 @@ class Scheduler(tornado.tcpserver.TCPServer):
             self.orderQueue = newQueue
             await self.updateDatabase()
         print(newQueue)
-        self.setRobotGoals()
+        await self.setRobotGoals()
 
 if __name__ == "__main__":
     logging.getLogger().setLevel(logging.DEBUG)

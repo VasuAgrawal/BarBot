@@ -30,22 +30,22 @@ class Robot(object):
     def getOrders(self):
         return self.orders
 
-    def getTripDistance(self, barX, barY):
+    def getTripDistance(self, barX, barY, locations):
         if not self.inTransit:
             return 0
         else:
             # currently on a trip
-            (currX, currY, currZ) = self.getLocation()
+            (currX, currY, currZ) = self.getLocation(locations)
             totalDist = 0
             for order in self.getOrders():
-                (orderX, orderY, orderZ) = order.getLocation()
+                (orderX, orderY, orderZ) = order.getLocation(locations)
                 totalDist += distance(currX, currY, orderX, orderY)
                 (currX, currY) = (orderX, orderY)
             totalDist += distance(currX, currY, barX, barY)
             return totalDist
 
     def move(self, destX, destY):
-        (robotX, robotY, robotZ) = self.getLocation()
+        (robotX, robotY, robotZ) = self.getLocation(locations)
         dx, dy = destX - robotX, destY - robotY
         angle = math.atan2(dy, dx)
         dx = math.cos(angle) * self.speed
