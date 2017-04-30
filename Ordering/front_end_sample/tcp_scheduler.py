@@ -90,6 +90,7 @@ class Scheduler(tornado.tcpserver.TCPServer):
             logging.error("Invalid connection request state?")
 
     def update_robots(self):
+        #TODO: send different location message to each robot
         for robotId in self.robots:
             robot = self.robots[robotId]
             goal = robot.goal
@@ -206,7 +207,7 @@ class Scheduler(tornado.tcpserver.TCPServer):
 
     @tornado.gen.coroutine
     def deleteOrder(self, order):
-        body = 'command=delete,id=%s' % order.id
+        body = 'command=delete&id=%s' % order.id
         request = httpclient.HTTPRequest(self.destination, body=body, method="POST")
         response = yield self.http_client.fetch(request)
         print("order deleted")
