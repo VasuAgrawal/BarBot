@@ -706,7 +706,7 @@ def main():
     logging.info("Starting visualizer thread!")
 
     # publisher = Publisher("128.237.202.192", 4242)
-    publisher = Publisher("localhost", 4242)
+    publisher = Publisher("128.237.167.97", 4242)
     publisher_thread = threading.Thread(target=publisher.run)
     publisher_thread.start()
     logging.info("Starting publisher thread!")

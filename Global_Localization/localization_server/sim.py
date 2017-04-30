@@ -106,19 +106,19 @@ class DW(object):
                 if ((time % 200) == 0):
                     # Move the robot to the initial corner
                     self.pos = np.array([2, 2, 3.1], dtype=np.double);
-                    logging.debug("Robot in bottom left")
+                    logging.info("Robot in bottom left")
                 if ((time % 200) == 50):
                     # Move the robot to the second corner
                     self.pos = np.array([2, 22, 3.1], dtype=np.double)
-                    logging.debug("Robot in top left")
+                    logging.info("Robot in top left")
                 elif ((time % 200) == 100):
                     # Move the robot to the third corner
                     self.pos = np.array([22, 22, 3.1], dtype=np.double)
-                    logging.debug("Robot in top right")
+                    logging.info("Robot in top right")
                 elif ((time % 200) == 150):
                     # Move the robot to the fourth corner
                     self.pos = np.array([22, 2, 3.1], dtype=np.double)
-                    logging.debug("Robot in bottom right")
+                    logging.info("Robot in bottom right")
             else:
                 # Calculate a new position based on time. For now, wristbands will
                 # sweep a 1m radius circle in the XY plane.
@@ -194,7 +194,7 @@ class GLS(object):
             for dest_idx, dest in enumerate(self._modules):
                 self._measurements[src_idx].append(src.update(self._sim_time,
                     dest.pos))
-        self.print_measurements()
+        #self.print_measurements()
         self._sim_time += 1
 
 
@@ -297,7 +297,7 @@ class GLS(object):
 
 def main():
     np.random.seed(1)
-    logging.root.setLevel(logging.DEBUG)
+    logging.root.setLevel(logging.INFO)
     gls = GLS(beacons=7, wristbands = 1)
     # threading.Thread(target=gls.display).start()
     while True:
