@@ -43,7 +43,6 @@ def handle_location(data):
         (data.point.x,data.point.y,data.point.z) = (final[0],final[1],final[2])
         location_pub.publish(data) # Do something better here
 
-
 def handle_imu(data):
     imu_deq.append(data)
     
@@ -51,7 +50,6 @@ def handle_imu(data):
     if calibrated:
         data.heading += imu_offset
         location_pub.publish(data)
-
 
 def average(iterable):
     if iterable:
@@ -101,11 +99,11 @@ def handle_user_input():
                 except IndexError:
                     rospy.logwarn("Error in getting location data")
 
-            # if len(imu_data) < DESIRED:
-                # try:
-                    # imu_data.append(imu_deq.popleft())
-                # except IndexError:
-                    # rospy.logwarn("Error in getting imu data")
+            if len(imu_data) < DESIRED:
+                try:
+                    imu_data.append(imu_deq.popleft())
+                except IndexError:
+                    rospy.logwarn("Error in getting imu data")
 
         avg_x = average([data.point.x for data in location_data])
         avg_y = average([data.point.y for data in location_data])

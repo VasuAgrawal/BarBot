@@ -5,7 +5,7 @@ import rospy
 import time
 import struct
 
-from geometry_msgs.msg import PointStamped, Pose2D
+from geometry_msgs.msg import PointStamped, Pose
 from barbot.msg import Thruster
 from positions_pb2 import Point
 from positions_pb2 import Locations
@@ -35,7 +35,7 @@ class Broadcaster(object):
                 PointStamped, queue_size=1)
         self._waypoint_pub = rospy.Publisher("waypoint", Pose, queue_size=1)
         self._sock = None
-        rospb.loginfo("Broadcaster initialized\n");
+        rospy.loginfo("Broadcaster initialized\n");
 
 
     def _connect(self):
@@ -94,6 +94,6 @@ class Broadcaster(object):
 
 
 if __name__ == "__main__":
-    broadcaster = Broadcaster(dwm_id=7) # Initializes publishers
+    broadcaster = Broadcaster(dwm_id=7, addr="192.168.1.108") # Initializes publishers
     rospy.init_node("SchedulerBroadcaster", log_level=rospy.INFO)
     broadcaster.update()
