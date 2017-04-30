@@ -7,7 +7,7 @@ from geometry_msgs.msg import PointStamped
 
 
 class Observer(object):
-    def __init__(self, state_topic="state", imu_topic="calibrated_imu", location_topic="calibrated_location"):
+    def __init__(self, state_topic="calibrated_state", imu_topic="calibrated_imu", location_topic="calibrated_location"):
 
         self.state_pub = rospy.Publisher(state_topic, Location, queue_size=1)
 

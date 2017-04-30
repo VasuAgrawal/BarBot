@@ -53,6 +53,7 @@ class IMU(object):
         msg.heading = heading
         msg.roll = roll
         msg.pitch = pitch
+        msg.header.stamp = rospy.Time.now()
         return msg
 
     def getQuaternion(self):

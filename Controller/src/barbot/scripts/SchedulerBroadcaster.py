@@ -33,7 +33,8 @@ class Broadcaster(object):
         self._port = port
         self._location_pub = rospy.Publisher("raw_location", 
                 PointStamped, queue_size=1)
-        self._waypoint_pub = rospy.Publisher("waypoint", Pose, queue_size=1)
+        self._waypoint_pub = rospy.Publisher("raw_waypoint",
+                PointStamped, queue_size=1)
         self._sock = None
         rospy.loginfo("Broadcaster initialized\n");
 
@@ -55,6 +56,8 @@ class Broadcaster(object):
     def _push_location(self, point):
         self._location_pub.publish(point)
 
+    def _push_waypoint(self, point):
+        self._waypoint_pub.publish(point)
 
     def update(self):
         while not rospy.is_shutdown():
@@ -76,13 +79,20 @@ class Broadcaster(object):
                     point = loc.locations[self._dwm_id]
 
                     location = PointStamped()
-                    location = PointStamped()
                     location.point.x = point.x
                     location.point.y = point.y
                     location.point.z = point.z
                     location.header.stamp = rospy.Time.now()
-
                     self._push_location(location)
+                
+                    point = loc.waypoint
+
+                    waypoint = PointStamped()
+                    waypoint.point.x = point.x
+                    waypoint.point.y = point.y
+                    waypoint.point.z = point.z
+                    waypoint.header.stamp = rospy.Time.now()
+                    self._push_waypoint(waypoint)
                 else:
                     rospy.logwarn(
                             "Received location update without robot ID: %d",

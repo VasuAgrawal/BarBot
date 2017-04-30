@@ -41,7 +41,7 @@ def handle_location(data):
 
         # Publish normalized data
         (data.point.x,data.point.y,data.point.z) = (final[0],final[1],final[2])
-        location_pub.publish(data) # Do something better here
+        location_pub.publish(data)
 
 def handle_imu(data):
     imu_deq.append(data)
@@ -50,6 +50,23 @@ def handle_imu(data):
     if calibrated:
         data.heading += imu_offset
         imu_pub.publish(data)
+
+def handle_waypoint(data):
+    # If calibrated, convert this reading into a calibrated one and republish.
+    if calibrated:
+        # Project uncalibrated location onto the pool plane
+        # http://stackoverflow.com/questions/9605556/how-to-project-a-3d-point-to-a-3d-plane
+        raw = np.array([data.point.x, data.point.y, data.point.z])
+        v = raw - pool_plane_origin
+        dist = np.dot(v, pool_plane_normal)
+        projected = raw - dist*pool_plane_normal
+
+        # Rotate data from pool plane to XY plane
+        final = rmat.dot(projected)
+
+        # Publish normalized data
+        (data.point.x,data.point.y,data.point.z) = (final[0],final[1],final[2])
+        waypoint_pub.publish(data)        
 
 def average(iterable):
     if iterable:
@@ -176,9 +193,12 @@ if __name__ == "__main__":
     global imu_pub
     location_pub = rospy.Publisher("calibrated_location", PointStamped, 
             queue_size=1)
+    waypoint_pub = rospy.Publisher("calibrated_waypoint", PointStamped,
+            queue_size=1)
     imu_pub = rospy.Publisher("calibrated_imu", Euler, queue_size=1)
 
     rospy.init_node("Calibrator", log_level=rospy.INFO)
     rospy.Subscriber("raw_location", PointStamped, handle_location)
+    rospy.Subscriber("raw_waypoint", PointStamped, handle_waypoint)
     rospy.Subscriber("imu_topic/Euler", Euler, handle_imu)
     rospy.spin()

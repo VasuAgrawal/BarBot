@@ -5,7 +5,7 @@ import math
 
 class Controller(object):
     def __init__(self, kp, ki, kd, speed=0.5, turn_speed=0.25, threshold=0.1, theta_threshold=0.05, 
-        thruster_topic="thruster", waypoint_topic="waypoint", state_topic="state"):
+        thruster_topic="thruster", waypoint_topic="calibrated_waypoint", state_topic="calibrated_state"):
 
         self.kp = kp
         self.ki = ki
