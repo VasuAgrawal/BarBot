@@ -28,6 +28,7 @@ class Scheduler(tornado.tcpserver.TCPServer):
         super().__init__(*args, **kwargs)
 
         self.http_client = httpclient.AsyncHTTPClient()
+        self.destination = 'http://localhost:8080/scheduler/'
 
         # TODO: update these with actual coordinates of the bar
         self.barX = 0
@@ -107,8 +108,7 @@ class Scheduler(tornado.tcpserver.TCPServer):
     @tornado.gen.coroutine
     def getAllOrders(self):
         # fetch orders from the database by sending a get request
-        destination = 'http://localhost:8080/scheduler/'
-        request = httpclient.HTTPRequest(destination, method="GET")
+        request = httpclient.HTTPRequest(self.destination, method="GET")
         response = yield self.http_client.fetch(request)
         db_orders = eval(response.buffer.read()) #I'm sorry Kosbie
         orders = []
@@ -195,7 +195,6 @@ class Scheduler(tornado.tcpserver.TCPServer):
         for order in self.orderQueue:
             robotId = -1 if order.robot == None else order.robot.id
             body = 'id=%s&robot_id=%s&priority=%s' % (order.id, robotId, order.priority)
-            destination = 'http://localhost:8080/scheduler/'
             request = httpclient.HTTPRequest(destination, body=body, method="POST")
             response = yield self.http_client.fetch(request)
        
@@ -206,8 +205,7 @@ class Scheduler(tornado.tcpserver.TCPServer):
 
     def deleteOrder(self, order):
         body = 'id=%s'
-        destination = 'http://localhost:8080/scheduler/'
-        request = httpclient.HTTPRequest(destination, body=body, method="DELETE")
+        request = httpclient.HTTPRequest(self.destination, body=body, method="DELETE")
         response = yield self.http_client.fetch(request)
 
     @tornado.gen.coroutine 
