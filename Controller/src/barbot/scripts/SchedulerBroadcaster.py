@@ -94,6 +94,6 @@ class Broadcaster(object):
 
 
 if __name__ == "__main__":
-    broadcaster = Broadcaster(dwm_id=7, addr="192.168.1.108") # Initializes publishers
+    broadcaster = Broadcaster(dwm_id=7, addr="128.237.167.97") # Initializes publishers
     rospy.init_node("SchedulerBroadcaster", log_level=rospy.INFO)
     broadcaster.update()

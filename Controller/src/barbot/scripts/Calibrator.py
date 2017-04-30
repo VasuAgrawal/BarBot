@@ -49,7 +49,7 @@ def handle_imu(data):
     # If calibrated, convert this reading into a calibrated one and republish.
     if calibrated:
         data.heading += imu_offset
-        location_pub.publish(data)
+        imu_pub.publish(data)
 
 def average(iterable):
     if iterable:
@@ -127,7 +127,7 @@ def handle_user_input():
 
     # Use bottom left calibration point as origin of pool plane
     global pool_plane_origin
-    pool_plane_origin = [p0.x, p0.y, p0.z]
+    pool_plane_origin = np.array([p0.x, p0.y, p0.z])
 
     # Compute normal of the pool plane
     v1 = np.array([p1.x-p0.x, p1.y-p0.y, p1.z-p0.z])
@@ -148,9 +148,9 @@ def handle_user_input():
     (x, y, z) = (axis[0], axis[1], axis[2])
 
     global rmat
-    rmat = [[x*x*C+c,   x*y*C-z*s, x*z*C+y*s],
-            [y*x*C+z*s, y*y*C+c,   y*z*C-x*s],
-            [z*x*C-y*s, z*y*C+x*s, z*z*C+c  ]]
+    rmat = np.array([[x*x*C+c,   x*y*C-z*s, x*z*C+y*s],
+                    [y*x*C+z*s, y*y*C+c,   y*z*C-x*s],
+                    [z*x*C-y*s, z*y*C+x*s, z*z*C+c  ]])
 
     # Compute rotation between GLS frame and pool frame
     # v2 is from bottom left to bottom right - treat this as x axis
