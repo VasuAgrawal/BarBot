@@ -3,7 +3,7 @@
     <tr class="order" id="m{{ order.id }}">
       <td>{% module linkify(str(order.id)) %}</td>
       <td class="mdl-data-table__cell--non-numeric">{% module linkify(order.drinkType) %}</td>
-      <td class="mdl-data-table__cell--non-numeric">{% module linkify(str(order.time)) %}</td>
+      <td class="mdl-data-table__cell--non-numeric">{% module linkify(order.time.strftime('%H:%M')) %}</td>
       <td>{% module linkify(str(order.robot)) %}</td>
       <td>
         <button class="mdl-button mdl-js-button mdl-button--raised mdl-js-ripple-effect mdl-button--accent" type="submit">
