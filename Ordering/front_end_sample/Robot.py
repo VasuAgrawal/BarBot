@@ -35,17 +35,17 @@ class Robot(object):
             return 0
         else:
             # currently on a trip
-            (currX, currY) = self.getLocation()
+            (currX, currY, currZ) = self.getLocation()
             totalDist = 0
             for order in self.getOrders():
-                (orderX, orderY) = order.getLocation()
+                (orderX, orderY, orderZ) = order.getLocation()
                 totalDist += distance(currX, currY, orderX, orderY)
                 (currX, currY) = (orderX, orderY)
             totalDist += distance(currX, currY, barX, barY)
             return totalDist
 
     def move(self, destX, destY):
-        (robotX, robotY) = self.getLocation()
+        (robotX, robotY, robotZ) = self.getLocation()
         dx, dy = destX - robotX, destY - robotY
         angle = math.atan2(dy, dx)
         dx = math.cos(angle) * self.speed

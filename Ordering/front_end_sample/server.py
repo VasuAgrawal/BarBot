@@ -403,9 +403,9 @@ class BarBotApplication(tornado.web.Application):
         }
         tornado.web.Application.__init__(self, handlers, **settings)
 
-        dsn = 'dbname=template1 user=Kim password=icanswim ' \
-                 'host=localhost port=10601'
-        #dsn = 'dbname=barbotdb user=barbotdev password=icanswim host=localhost port=10601'
+        #dsn = 'dbname=template1 user=Kim password=icanswim ' \
+        #         'host=localhost port=10601'
+        dsn = 'dbname=barbotdb user=barbotdev password=icanswim host=localhost port=10601'
         #dsn = 'dbname=template1 user=postgres ' \
 
         self.db = momoko.Pool(dsn=dsn, size=2, ioloop=ioloop)

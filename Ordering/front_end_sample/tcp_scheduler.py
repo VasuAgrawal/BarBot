@@ -28,7 +28,8 @@ class Scheduler(tornado.tcpserver.TCPServer):
         super().__init__(*args, **kwargs)
 
         self.http_client = httpclient.AsyncHTTPClient()
-        self.destination = 'http://localhost:8080/scheduler/'
+        #self.destination = 'http://localhost:8080/scheduler/'
+        self.destination = 'http://128.237.167.97:8080/scheduler/'
 
         # TODO: update these with actual coordinates of the bar
         self.barX = 0
@@ -195,7 +196,7 @@ class Scheduler(tornado.tcpserver.TCPServer):
         for order in self.orderQueue:
             robotId = -1 if order.robot == None else order.robot.id
             body = 'id=%s&robot_id=%s&priority=%s' % (order.id, robotId, order.priority)
-            request = httpclient.HTTPRequest(destination, body=body, method="POST")
+            request = httpclient.HTTPRequest(self.destination, body=body, method="POST")
             response = yield self.http_client.fetch(request)
        
     def intersects(self, robot, destX, destY):
