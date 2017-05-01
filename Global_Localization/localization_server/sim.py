@@ -298,7 +298,7 @@ class GLS(object):
 def main():
     np.random.seed(1)
     logging.root.setLevel(logging.INFO)
-    gls = GLS(beacons=7, wristbands = 1)
+    gls = GLS(beacons=7, wristbands = 3s)
     # threading.Thread(target=gls.display).start()
     while True:
         gls.step()
