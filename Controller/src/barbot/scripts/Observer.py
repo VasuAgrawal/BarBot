@@ -11,15 +11,14 @@ class Observer(object):
 
         self.state_pub = rospy.Publisher(state_topic, Location, queue_size=1)
 
-        imu_sub = message_filters.Subscriber(imu_topic, Euler)
-        location_sub = message_filters.Subscriber(location_topic, PointStamped)
+        imu_sub = rospy.Subscriber(imu_topic, Euler, self.imu_callback)
+        location_sub = rospy.Subscriber(location_topic, PointStamped, self.location_callback)
 
-        ts = message_filters.TimeSynchronizer([imu_sub, location_sub], 1)
-        ts.registerCallback(self.callback)
+        self.theta = 0.0
+
     
-    def callback(self, imu_data, location_data):
+    def location_callback(self, location_data):
         time = location_data.header.stamp
-        theta = imu_data.heading # I think???
         x = location_data.point.x
         y = location_data.point.y
 
@@ -27,9 +26,12 @@ class Observer(object):
         msg.header.stamp = time
         msg.pose.x = x
         msg.pose.y = y
-        msg.pose.theta = theta
+        msg.pose.theta = self.theta
 
         self.state_pub.publish(msg)
+
+    def imu_callback(self, imu_data):
+        self.theta = imu_data.heading
 
 if __name__ == '__main__':
     rospy.init_node("observer")
