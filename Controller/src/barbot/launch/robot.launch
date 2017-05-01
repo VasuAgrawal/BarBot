@@ -4,4 +4,5 @@
     <node name="SchedulerBroadcaster" pkg="barbot" 
         type="SchedulerBroadcaster.py" />
     <node name="IMU" pkg="barbot" type="IMU.py" />
+    <node name="Observer" pkg="barbot" type="Observer.py" />
 </launch>
