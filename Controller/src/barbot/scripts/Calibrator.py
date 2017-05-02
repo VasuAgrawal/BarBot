@@ -22,7 +22,17 @@ pool_plane_origin = np.array([0.0, 0.0, 0.0])
 pool_plane_normal = np.array([0.0, 0.0, 0.0])
 rmat = np.array([[0.0, 0.0, 0.0], [0.0, 0.0, 0.0], [0.0, 0.0, 0.0]])
 
-imu_offset = 0.0
+frame_offset = 0.0
+imu_offset = 0
+
+def project(point):
+    v = point - pool_plane_origin
+    dist = np.dot(v, pool_plane_normal)
+    projected = point - dist * pool_plane_normal
+    final = rmat.dot(projected)
+    final[2] = 0
+    return final
+
 
 def handle_location(data):
     location_deq.append(data)
@@ -32,12 +42,7 @@ def handle_location(data):
         # Project uncalibrated location onto the pool plane
         # http://stackoverflow.com/questions/9605556/how-to-project-a-3d-point-to-a-3d-plane
         raw = np.array([data.point.x, data.point.y, data.point.z])
-        v = raw - pool_plane_origin
-        dist = np.dot(v, pool_plane_normal)
-        projected = raw - dist*pool_plane_normal
-
-        # Rotate data from pool plane to XY plane
-        final = rmat.dot(projected)
+        final = project(raw)
 
         # Publish normalized data
         (data.point.x,data.point.y,data.point.z) = (final[0],final[1],final[2])
@@ -48,7 +53,33 @@ def handle_imu(data):
     
     # If calibrated, convert this reading into a calibrated one and republish.
     if calibrated:
-        data.heading += imu_offset
+        heading = data.heading - imu_offset # degrees
+        heading = int(heading + 360) % 360 # convert to [0, 360)
+        print("Subtracting IMU Offset: ", heading, end=" ")
+
+        # Multiply by pi/180, convert to radians
+        heading = math.radians(heading) # [0, 2*PI)
+        print("Converted to radians: ", heading, end=" ")
+
+        # Attempt to subtract the frame offset
+        heading -= frame_offset
+        print("Subtracted frame offset: ", heading, end=" ")
+        
+        # Set it back to the right range
+        heading += 2 * math.pi
+        heading %= 2 * math.pi # [0, 2*PI)
+        heading -= 1 * math.pi # looks nicer, in [-PI, PI)
+        print("Final heading: ", heading)
+
+        # heading = data.heading + imu_offset
+        # heading = int(heading) % 360
+        # heading = float(heading) / 180.0 * math.pi
+        # heading += math.pi / 2
+        # heading -= frame_offset
+        # heading = heading % (2*math.pi)
+        # heading = (heading + math.pi) % (2*math.pi) - math.pi
+
+        data.heading = heading
         imu_pub.publish(data)
 
 def handle_waypoint(data):
@@ -171,12 +202,18 @@ def handle_user_input():
 
     # Compute rotation between GLS frame and pool frame
     # v2 is from bottom left to bottom right - treat this as x axis
-    v2_norm = np.linalg.norm(v2)
-    frame_offset = math.acos(np.dot(v2, np.array([1.0, 0.0, 0.0])) / (v2_norm))
-    global imu_offset
-    imu_offset = frame_offset + calibration_points[0].heading # SIGNS HERE!
+    projected_v2 = project(v2)
+    projected_v2_norm = np.linalg.norm(projected_v2)
 
-    rospy.loginfo("IMU offset: %f\n", imu_offset)
+    global frame_offset
+    frame_offset = math.acos(np.dot(projected_v2, np.array([1.0, 0.0, 0.0])) / 
+            (projected_v2_norm))
+
+    global imu_offset
+    imu_offset = calibration_points[0].heading # SIGNS HERE!
+
+    rospy.loginfo("Heading offset: %d\n", imu_offset)
+    rospy.loginfo("Frame offset: %f\n", frame_offset)
 
     global calibrated
     calibrated = True
