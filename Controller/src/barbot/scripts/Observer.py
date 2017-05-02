@@ -14,24 +14,25 @@ class Observer(object):
         imu_sub = rospy.Subscriber(imu_topic, Euler, self.imu_callback)
         location_sub = rospy.Subscriber(location_topic, PointStamped, self.location_callback)
 
+        self.x = 0.0
+        self.y = 0.0
         self.theta = 0.0
 
     
     def location_callback(self, location_data):
-        time = location_data.header.stamp
-        x = location_data.point.x
-        y = location_data.point.y
+        self.x = location_data.point.x
+        self.y = location_data.point.y
 
-        msg = Location()
-        msg.header.stamp = time
-        msg.pose.x = x
-        msg.pose.y = y
-        msg.pose.theta = self.theta
-
-        self.state_pub.publish(msg)
 
     def imu_callback(self, imu_data):
         self.theta = imu_data.heading
+        msg = Location()
+
+        msg.pose.x = self.x
+        msg.pose.y = self.y
+        msg.pose.theta = self.theta
+
+        self.state_pub.publish(msg)
 
 if __name__ == '__main__':
     rospy.init_node("observer")
