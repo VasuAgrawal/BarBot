@@ -266,8 +266,8 @@ class Visualizer(object):
 
 
         for key, point in self._wristband_pos_guess.items():
-            res, = ax.plot([point[0]], [point[1]], [point[2]], marker='s',
-                    c=[1.0, 0.0, 0.0, 1.0], alpha=1.0)
+            res, = ax.plot([point[0]], [point[1]], [point[2]], marker='*',
+                    c=[1.0, 0.5, 0.5, 1.0], alpha=1.0)
             self._plot_points.append(res)
 
 
@@ -375,6 +375,9 @@ class Publisher(object):
                 logging.debug("Successfully published data to scheduler!")
             else:
                 logging.warning("Unable to send data to scheduler!")
+                while self._sock is None:
+                    time.sleep(1)
+                    self._connect()
 
             time.sleep(max(1 - (time.time() - start), 0))
 
@@ -645,7 +648,8 @@ class Solver(object):
         pos_guess = dict()
 
         for wristband_idx in self._wristband_idx:
-            logging.info("Solving for wb id: %d", wristband_idx)
+            dwm_id = self._dwm_idx_mapping_inv[wristband_idx]
+            logging.info("Solving for wb id: %d", dwm_id)
         
             # Pick some reasonable starting point. For now, we'll just use
             pos = np.zeros(3, dtype=np.double)
@@ -654,7 +658,6 @@ class Solver(object):
             new_pos = scipy.optimize.leastsq(self._wristband_loss, pos, 
                     (wristband_idx,))[0]
             
-            dwm_id = self._dwm_idx_mapping_inv[wristband_idx]
             pos_guess[dwm_id] = new_pos
             # logging.info("Position for dwm id %d: %s", dwm_id, new_pos)
 
@@ -706,7 +709,7 @@ def main():
     logging.info("Starting visualizer thread!")
 
     # publisher = Publisher("128.237.202.192", 4242)
-    publisher = Publisher("128.237.167.97", 4242)
+    publisher = Publisher("192.168.1.126", 4242)
     publisher_thread = threading.Thread(target=publisher.run)
     publisher_thread.start()
     logging.info("Starting publisher thread!")
