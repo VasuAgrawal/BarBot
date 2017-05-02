@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 import rospy
 from barbot.msg import Location, Thruster
+import Tkinter
 import math
 
 class Controller(object):
@@ -95,10 +96,56 @@ class Controller(object):
         print("distance2 is %f, theta_error is %f, thruster left is %f, thruster right is %f" % (distance2, theta_error, left, right))
         self.thruster_pub.publish(msg)
 
+    def ui(self):
+        self.root = Tkinter.Tk()
+        Tkinter.Label(master=self.root, text="kp").grid(row=0, column=0)
+        Tkinter.Label(master=self.root, text="ki").grid(row=1, column=0)
+        Tkinter.Label(master=self.root, text="kd").grid(row=2, column=0)
+
+        self.kp_entry=Tkinter.Entry(master=self.root)
+        self.kp_entry.grid(row=0, column=1)
+        self.kp_entry.insert(Tkinter.END, str(self.kp))
+
+        self.ki_entry=Tkinter.Entry(master=self.root)
+        self.ki_entry.grid(row=1, column=1)
+        self.ki_entry.insert(Tkinter.END, str(self.ki))
+
+        self.kd_entry=Tkinter.Entry(master=self.root)
+        self.kd_entry.grid(row=2, column=1)
+        self.kd_entry.insert(Tkinter.END, str(self.kd))
+
+        Tkinter.Button(master=self.root, text="Apply", command=self.updatePID).grid(row=3, column=1, columnspan=2)
+        Tkinter.mainloop()
+
+    def updatePID(self):
+        try:
+            kp = float(self.kp_entry.get())
+            ki = float(self.ki_entry.get())
+            kd = float(self.kd_entry.get())
+            self.kp = kp
+            self.ki = ki
+            self.kd = kd
+
+            rospy.loginfo("PID parameters updated");
+        except:
+            self.kp_entry.delete(0, Tkinter.END)
+            self.ki_entry.delete(0, Tkinter.END)
+            self.kd_entry.delete(0, Tkinter.END)
+
+            self.kp_entry.insert(Tkinter.END, str(self.kp))
+            self.ki_entry.insert(Tkinter.END, str(self.ki))
+            self.kd_entry.insert(Tkinter.END, str(self.kd))
+
+            print("Invalid Entries")
+
+
+
+
 
 
 
 if __name__ == '__main__':
     rospy.init_node("controller")
-    controller = Controller(1., 0., 0)
+    controller = Controller(1., 0., 0.)
+    controller.ui()
     rospy.spin()
