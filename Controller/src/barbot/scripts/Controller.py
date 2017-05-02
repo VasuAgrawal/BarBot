@@ -20,6 +20,12 @@ class Controller(object):
 
         self.error = 0.0
         self.last_error = 0.0
+
+        self.root = Tkinter.Tk()
+        self.left = Tkinter.DoubleVar()
+        self.right = Tkinter.DoubleVar()
+        self.error_var = Tkinter.DoubleVar()
+
         self.waypoint = None
         self.running = False
         self.last_time = rospy.get_time()
@@ -93,14 +99,25 @@ class Controller(object):
         msg.left = left
         msg.right = right
 
+        self.error_var.set(self.error)
+        self.left.set(left)
+        self.right.set(right)
+
         print("distance2 is %f, theta_error is %f, thruster left is %f, thruster right is %f" % (distance2, theta_error, left, right))
         self.thruster_pub.publish(msg)
 
     def ui(self):
-        self.root = Tkinter.Tk()
         Tkinter.Label(master=self.root, text="kp").grid(row=0, column=0)
         Tkinter.Label(master=self.root, text="ki").grid(row=1, column=0)
         Tkinter.Label(master=self.root, text="kd").grid(row=2, column=0)
+
+        Tkinter.Label(master=self.root, text="left").grid(row=4, column=0)
+        Tkinter.Label(master=self.root, text="right").grid(row=5, column=0)
+        Tkinter.Label(master=self.root, text="error").grid(row=6, column=0)
+
+        Tkinter.Label(master=self.root, textvariable=self.left).grid(row=4, column=1)
+        Tkinter.Label(master=self.root, textvariable=self.right).grid(row=5, column=1)
+        Tkinter.Label(master=self.root, textvariable=self.error_var).grid(row=6, column=1)
 
         self.kp_entry=Tkinter.Entry(master=self.root)
         self.kp_entry.grid(row=0, column=1)
