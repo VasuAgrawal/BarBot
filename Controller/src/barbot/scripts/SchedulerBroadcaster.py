@@ -45,6 +45,7 @@ class Broadcaster(object):
             self._sock.connect((self._addr, self._port))
             request = ConnectionRequest()
             request.type = ConnectionRequest.ROBOT
+            request.robotId = self._dwm_id
             data = make_packet_from_bytes(request.SerializeToString())
             self._sock.send(data)
 

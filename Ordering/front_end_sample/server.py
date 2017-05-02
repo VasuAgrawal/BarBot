@@ -76,6 +76,7 @@ class RegisterHandler(PostgresHandler):
 
     @tornado.gen.coroutine
     def post(self):
+        print("registering!")
         name = str(self.get_argument("Name"))
         email = str(self.get_argument("Email"))
         password = str(self.get_argument("Password"))
