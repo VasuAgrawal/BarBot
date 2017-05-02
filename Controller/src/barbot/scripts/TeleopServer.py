@@ -56,6 +56,7 @@ class GamepadHandler(tornado.websocket.WebSocketHandler):
         outputs = np.maximum(-1.0, np.minimum(1.0,
                         (FORWARD * forward + BACKWARD * backward + 
                             CCW * ccw + CW * cw)))
+        outputs[1] *= -1
         return outputs
 
 

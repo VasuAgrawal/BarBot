@@ -22,7 +22,8 @@ pool_plane_origin = np.array([0.0, 0.0, 0.0])
 pool_plane_normal = np.array([0.0, 0.0, 0.0])
 rmat = np.array([[0.0, 0.0, 0.0], [0.0, 0.0, 0.0], [0.0, 0.0, 0.0]])
 
-imu_offset = 0.0
+frame_offset = 0.0
+imu_offset = 0
 
 def handle_location(data):
     location_deq.append(data)
@@ -48,7 +49,14 @@ def handle_imu(data):
     
     # If calibrated, convert this reading into a calibrated one and republish.
     if calibrated:
-        data.heading += imu_offset
+        heading = data.heading + imu_offset
+        heading = int(heading) % 360
+        heading = float(heading) / 180.0 * math.pi
+        heading += frame_offset
+        heading = heading % (2*math.pi)
+        heading = (heading + math.pi) % (2*math.pi) - math.pi
+
+        data.heading = heading
         imu_pub.publish(data)
 
 def handle_waypoint(data):
@@ -172,11 +180,13 @@ def handle_user_input():
     # Compute rotation between GLS frame and pool frame
     # v2 is from bottom left to bottom right - treat this as x axis
     v2_norm = np.linalg.norm(v2)
+    global frame_offset
     frame_offset = math.acos(np.dot(v2, np.array([1.0, 0.0, 0.0])) / (v2_norm))
     global imu_offset
-    imu_offset = frame_offset + calibration_points[0].heading # SIGNS HERE!
+    imu_offset = calibration_points[0].heading # SIGNS HERE!
 
-    rospy.loginfo("IMU offset: %f\n", imu_offset)
+    rospy.loginfo("Heading offset: %d\n", imu_offset)
+    rospy.loginfo("Frame offset: %f\n", frame_offset)
 
     global calibrated
     calibrated = True

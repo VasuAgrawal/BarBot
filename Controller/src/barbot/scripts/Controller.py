@@ -3,9 +3,11 @@ import rospy
 from barbot.msg import Location, Thruster
 import Tkinter
 import math
+from geometry_msgs.msg import PointStamped
 
 class Controller(object):
-    def __init__(self, kp, ki, kd, speed=0.5, turn_speed=0.25, threshold=0.1, theta_threshold=0.05, 
+    def __init__(self, kp, ki, kd, speed=0.5, turn_speed=0.25, threshold=0.1,
+            theta_threshold=0.15,
         thruster_topic="thruster", waypoint_topic="calibrated_waypoint", state_topic="calibrated_state"):
 
         self.kp = kp
@@ -25,17 +27,17 @@ class Controller(object):
         self.thruster_pub = rospy.Publisher(thruster_topic, Thruster, queue_size=1)
 
         rospy.Subscriber(state_topic, Location, self.state_callback)
-        rospy.Subscriber(waypoint_topic, Location, self.waypoint_callback)
+        rospy.Subscriber(waypoint_topic, PointStamped, self.waypoint_callback)
 
         rospy.loginfo("Controller initialized");
 
     def waypoint_callback(self, data):
         self.running = True
-        self.waypoint = data.pose
+        self.waypoint = data
 
     def state_callback(self, data):
         left = 0.0
-        rigth = 0.0
+        right = 0.0
         distance2 = 0.0
         theta_error = 0.0
 
@@ -43,13 +45,12 @@ class Controller(object):
         now = data.header.stamp
 
         if (self.waypoint != None and self.running):
-            err_x = self.waypoint.pose.x - state.x
-            err_y = self.waypoint.pose.y - state.y
+            err_x = self.waypoint.point.x - state.x
+            err_y = self.waypoint.point.y - state.y
 
-            distance2 = err_x*err_X + err_y*err_y
+            distance2 = err_x*err_x + err_y*err_y
 
             if (distance2 > self.threshold*self.threshold):
-
                 goal_theta = math.atan2(err_y, err_x)
                 theta_error = ((goal_theta - state.theta) + math.pi) % (2*math.pi) - math.pi
 
@@ -59,7 +60,6 @@ class Controller(object):
 
                 else:
                     self.error += theta_error
-
                     now = rospy.get_time()
                     dt = now-self.last_time
                     derr = theta_error-self.last_error
