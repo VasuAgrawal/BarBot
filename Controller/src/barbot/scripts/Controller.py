@@ -4,6 +4,8 @@ from barbot.msg import Location, Thruster
 import Tkinter
 import math
 from geometry_msgs.msg import PointStamped
+import matplotlib
+import numpy as np
 
 class Controller(object):
     def __init__(self, kp, ki, kd, speed=0.5, turn_speed=0.25, threshold=0.1,
@@ -172,7 +174,7 @@ class Controller(object):
         self.kd_entry.grid(row=3, column=1)
         self.kd_entry.insert(Tkinter.END, str(self.kd))
 
-        Tkinter.Button(master=self.root, text="Apply", command=self.updatePID).grid(row=4, column=0, columnspan=2)
+        Tkinter.Button(master=self.root, text="Update", command=self.updatePID).grid(row=4, column=0, columnspan=2)
         Tkinter.mainloop()
 
     def updatePID(self):
