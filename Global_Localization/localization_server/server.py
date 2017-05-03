@@ -33,6 +33,8 @@ from protos.positions_pb2 import Point
 from protos.positions_pb2 import Locations
 from protos.positions_pb2 import ConnectionRequest
 
+UPDATE_SLEEP = .25
+
 # Globals are probably bad right?
 messages = queue.Queue()
 data_lock = threading.Lock()
@@ -306,7 +308,7 @@ class Visualizer(object):
 
             self.plot()
             logging.debug(self.format_measured())
-            time.sleep(max(1 - (time.time() - start), 0))
+            time.sleep(max(UPDATE_SLEEP - (time.time() - start), 0))
 
 
 class Publisher(object):
@@ -379,7 +381,7 @@ class Publisher(object):
                     time.sleep(1)
                     self._connect()
 
-            time.sleep(max(1 - (time.time() - start), 0))
+            time.sleep(max(UPDATE_SLEEP - (time.time() - start), 0))
 
 
 class Solver(object):
@@ -686,7 +688,7 @@ class Solver(object):
                 logging.warning("Beacon positions not stable, not solving for"
                         " wristbands yet!")
 
-            time.sleep(max(0, 1 - (time.time() - start_time)))
+            time.sleep(max(0, UPDATE_SLEEP - (time.time() - start_time)))
                 
 
 def main():
