@@ -18,7 +18,7 @@ mag_deq = collections.deque(maxlen=10)
 grav_deq = collections.deque(maxlen=10)
 
 calibration_points = []
-calibrated = False
+calibrated = True
 
 pool_plane_origin = np.array([0.0, 0.0, 0.0])
 pool_plane_normal = np.array([0.0, 0.0, 0.0])
