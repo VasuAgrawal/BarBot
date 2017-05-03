@@ -57,22 +57,24 @@ def handle_location(data):
 def handle_grav(data):
     grav_deq.append(data)
     grav_data = np.array([data.x, data.y, data.z])
-    # we want to rotate grav_data onto gvec
-    a = grav_data
-    b = gvec
+    norm = np.linalg.norm(grav_data)
 
-    v = np.cross(a, b)
-    s = np.linalg.norm(a, b)
-    c = np.dot(a, b)
+    phi = math.asin(data.x / norm)
+    cphi = math.cos(phi)
+    sphi = math.sin(phi)
 
-    vx_mat = np.array( [
-        [0, -v[2], v[1]], 
-        [v[2], 0, -v[0]], 
-        [-v[1], v[0], 0]]  )
+    theta = math.atan2(data.y / (-data.x*cphi), data.z / (data.x*cphi))
+    ctheta = math.cos(theta)
+    stheta = math.sin(theta)
+
+    rxry = np.array ( [
+        [cphi, 0, sphi],
+        [stheta*sphi, ctheta, -stheta*cphi],
+        [-ctheta*sphi, stheta, ctheta*cphi]
+        ] )
 
     global rgrav
-    rgrav = np.eye(3) + vx_mat + ((1-c)/(s*s))*vx_mat
-
+    rgrav = np.transpose(rxry)
 
 
 def handle_imu(data):
@@ -121,7 +123,7 @@ def handle_mag(data):
         heading = math.atan2(data_vec_w[1], data_vec_w[0]) # [-pi, pi)
         # if heading < 0:
             # heading += 2 * math.pi # [0, 2*pi)
-        print("Raw heading: %4f" % heading)
+        print("heading: %4f" % heading)
 
         heading -= imu_offset
         # heading = (heading + 2 * math.pi) % (2 * math.pi) # [0, 2*pi)
