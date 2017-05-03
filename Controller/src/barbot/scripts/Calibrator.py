@@ -88,11 +88,27 @@ def handle_mag(data):
 
     if calibrated:
         heading = math.atan2(data.y, data.x) # [-pi, pi)
+        # if heading < 0:
+            # heading += 2 * math.pi # [0, 2*pi)
         print("Raw heading: %4f" % heading)
-        heading -= imu_offset 
-        print("imu off: %4f, minus imu off: %4f" % (imu_offset, heading))
-        heading -= frame_offset
-        print("frame off: %4f, minus frame off: %4f" % (frame_offset, heading))
+
+        heading -= imu_offset
+        # heading = (heading + 2 * math.pi) % (2 * math.pi) # [0, 2*pi)
+        print("imu off: %4f, minus imu off: %4f, minus in deg: %d" %
+                (imu_offset, heading, math.degrees(heading)))
+
+        # heading -= frame_offset
+        # print("frame off: %4f, minus frame off: %4f" % (frame_offset, heading))
+
+        # heading *= -1
+        heading += 3 * 2 * math.pi
+        heading %= 2 * math.pi
+        if heading > math.pi:
+            heading -= 2 * math.pi
+
+        print("Normalized heading to [-pi, pi): %f, %f" % (heading,
+                math.degrees(heading)))
+        print()
 
         imu_data = Euler()
         imu_data.heading = heading
@@ -157,6 +173,7 @@ def handle_user_input():
 
         location_data = []
         imu_data = []
+        mag_data = []
         DESIRED = 5
 
         # TODO: More error handling
@@ -172,6 +189,12 @@ def handle_user_input():
                     imu_data.append(imu_deq.popleft())
                 except IndexError:
                     rospy.logwarn("Error in getting imu data")
+            
+            if len(mag_data) < DESIRED:
+                try:
+                    mag_data.append(mag_deq.popleft())
+                except IndexError:
+                    rospy.logwarn("Error in getting mag data")
 
         avg_x = average([data.point.x for data in location_data])
         avg_y = average([data.point.y for data in location_data])
@@ -242,6 +265,8 @@ def handle_user_input():
     mag_x = calibration_points[0].mag_x
     mag_y = calibration_points[0].mag_y
     imu_offset = math.atan2(mag_y, mag_x) # range [-pi, pi)
+    # if imu_offset < 0:
+        # imu_offset += 2 * math.pi # range[0, 2*pi)
 
     rospy.loginfo("Heading offset: %f\n", imu_offset)
     rospy.loginfo("Frame offset: %f\n", frame_offset)
@@ -269,5 +294,5 @@ if __name__ == "__main__":
     rospy.Subscriber("raw_location", PointStamped, handle_location)
     rospy.Subscriber("raw_waypoint", PointStamped, handle_waypoint)
     rospy.Subscriber("imu_topic/Euler", Euler, handle_imu)
-    rospy.Subscriber("imu_topic/Magnetometer", Vector3, handle_imu)
+    rospy.Subscriber("imu_topic/Magnetometer", Vector3, handle_mag)
     rospy.spin()
