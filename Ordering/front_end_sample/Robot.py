@@ -10,8 +10,9 @@ class Robot(object):
         self.capacity = capacity
         self.orders = []
         self.inTransit = False
-        self.speed = 5
         self.goal = None
+        self.goalTime = None
+        self.waitTime = 10 # 10 seconds
 
     def getLocation(self, locations):
         locationMap = locations.locations
@@ -43,14 +44,6 @@ class Robot(object):
                 (currX, currY) = (orderX, orderY)
             totalDist += distance(currX, currY, barX, barY)
             return totalDist
-
-    def move(self, destX, destY):
-        (robotX, robotY, robotZ) = self.getLocation(locations)
-        dx, dy = destX - robotX, destY - robotY
-        angle = math.atan2(dy, dx)
-        dx = math.cos(angle) * self.speed
-        dy = math.sin(angle) * self.speed
-        self.updateLocation((robotX + dx, robotY + dy))
 
     def isReady(self):
         orders = self.getOrders()

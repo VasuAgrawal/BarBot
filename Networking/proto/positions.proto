@@ -17,4 +17,6 @@ message ConnectionRequest {
         ROBOT = 1;
     }
     ConnectionType type = 1;
+
+    int robotId = 2;
 }

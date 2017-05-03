@@ -259,7 +259,7 @@ int main(int argc, char *argv[]) {
                     computeDistanceInit();
                     deca_sleep(RNG_DELAY_MS);
                 }
-                deca_sleep(1000);
+                deca_sleep(RNG_DELAY_MS);
             }
         }
     }

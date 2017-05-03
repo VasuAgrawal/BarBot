@@ -71,7 +71,8 @@ class Controller(object):
             self.error_var.set(math.sqrt(distance2))
 
             if (distance2 > self.threshold*self.threshold):
-                goal_theta = math.atan2(err_y, err_x)
+                goal_theta = math.atan2(err_y, -err_x)
+                # goal_theta = math.atan2(err_x, err_y)
                 theta_error = ((goal_theta - state.theta) + math.pi) % (2*math.pi) - math.pi
                 self.theta_error_var.set(theta_error)
 
@@ -118,9 +119,9 @@ class Controller(object):
         self.left.set(left)
         self.right.set(right)
 
-        self.state_x.set(data.x)
-        self.state_y.set(data.y)
-        self.state_t.set(data.theta)
+        self.state_x.set(state.x)
+        self.state_y.set(state.y)
+        self.state_t.set(state.theta)
 
         print("distance2 is %f, theta_error is %f, thruster left is %f, thruster right is %f" % (distance2, theta_error, left, right))
         self.thruster_pub.publish(msg)

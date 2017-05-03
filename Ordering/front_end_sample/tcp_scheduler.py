@@ -1,12 +1,14 @@
 #!/usr/bin/env python3
 import logging
 
+import copy
 import datetime
 import math
 import momoko
 from Order import Order
 from Robot import Robot
 import packet
+import time
 
 import tornado
 import tornado.tcpserver
@@ -28,24 +30,24 @@ class Scheduler(tornado.tcpserver.TCPServer):
         super().__init__(*args, **kwargs)
 
         self.http_client = httpclient.AsyncHTTPClient()
-        #self.destination = 'http://localhost:8080/scheduler/'
-        self.destination = 'http://128.237.167.97:8080/scheduler/'
+        self.destination = 'http://localhost:8080/scheduler/'
+       # self.destination = 'http://128.237.167.97:8080/scheduler/'
 
         # TODO: update these with actual coordinates of the bar
         self.barX = 0
         self.barY = 0
         self.barZ = 0
         # TODO: pick a reasonable number here
-        self.thresh = 1.5 # acceptable distance from customer for drop offs
+        self.thresh = .25 # acceptable distance from customer for drop offs
         self.numRobots = 1
         self.robots = dict()
         for i in range(self.numRobots):
             # TODO: replace this with actual wristband id
             robotWristbandId = i + 7
-            self.robots[robotWristbandId] = Robot(robotWristbandId)
+            self.robots[robotWristbandId] = Robot(robotWristbandId, capacity=1)
         self.orderQueue = []
 
-        self._real_robots = []
+        self._real_robots = dict()
         self._loc = Locations()
 
     @tornado.gen.coroutine
@@ -65,9 +67,9 @@ class Scheduler(tornado.tcpserver.TCPServer):
             self._loc = loc
 
     @tornado.gen.coroutine
-    def handle_robot(self, stream, address):
+    def handle_robot(self, robotId, stream, address):
         logging.info("Received ROBOT connection request!")
-        self._real_robots.append(stream)
+        self._real_robots[robotId] = stream
 
     @tornado.gen.coroutine
     def handle_stream(self, stream, address):
@@ -85,28 +87,32 @@ class Scheduler(tornado.tcpserver.TCPServer):
         if req.type == ConnectionRequest.GLS:
             self.handle_gls(stream, address)
         elif req.type == ConnectionRequest.ROBOT:
-            self.handle_robot(stream, address)
+            self.handle_robot(req.robotId, stream, address)
         else:
             logging.error("Invalid connection request state?")
 
     def update_robots(self):
-        #TODO: send different location message to each robot
         for robotId in self.robots:
             robot = self.robots[robotId]
             goal = robot.goal
+            location = copy.copy(self._loc)
             if goal == None: # without a goal should stay in place
-                (self._loc.waypoint.x, self._loc.waypoint.y, self._loc.waypoint.z) = robot.getLocation(self._loc)
+                (location.waypoint.x, location.waypoint.y, 
+                    location.waypoint.z) = robot.getLocation(self._loc)
             else:
-                (self._loc.waypoint.x, self._loc.waypoint.y, self._loc.waypoint.z) = goal
-            break # current set up assumes 1 robot :(
-        data = packet.make_packet_from_bytes(self._loc.SerializeToString())
-
-        for robot in self._real_robots[::-1]:
+                (location.waypoint.x, location.waypoint.y, 
+                    location.waypoint.z) = goal
+            data = packet.make_packet_from_bytes(location.SerializeToString())
+            if robotId in self._real_robots:
+                realRobot = self._real_robots[robotId]
+            else:
+                print("Robot %d not connected!" % robotId)
+                return
             try:
-                robot.write(data)
-            except Exception:
-                self._real_robots.remove(robot)
-
+                realRobot.write(data)
+            except:
+                del self._real_robots[realRobot]
+            
     @tornado.gen.coroutine
     def getAllOrders(self):
         # fetch orders from the database by sending a get request
@@ -225,9 +231,22 @@ class Scheduler(tornado.tcpserver.TCPServer):
                     (tX, tY, tZ) = targetOrder.getLocation(self._loc)
                     robot.goal = (tX, tY, tZ)
                     if self.intersects(robot, tX, tY, tZ):
-                        print("deleting order %d" % targetOrder.id)
-                        await self.deleteOrder(targetOrder)
-                        robotOrders.pop(0)
+                        if robot.goalTime == None:
+                            # wait until we've been near the customer for a while
+                            print("Near customer! Waiting %d seconds" 
+                                    % robot.waitTime)
+                            robot.goalTime = time.time()
+                        elif time.time() - robot.goalTime >= robot.waitTime:
+                            # customer should have it by now, mark the order as delivered
+                            print("deleting order %d" % targetOrder.id)
+                            await self.deleteOrder(targetOrder)
+                            robotOrders.pop(0)
+                            robot.goalTime = None
+                        else:
+                            print("Near customer! Waiting %d more seconds" %
+                                (robot.waitTime - (time.time() - robot.goalTime)))
+                    else:
+                        robot.goalTime = None
                 else: # go back to the bar and refill
                     if self.intersects(robot, self.barX, self.barY, self.barZ):
                         robot.inTransit = False
@@ -256,5 +275,5 @@ if __name__ == "__main__":
 
     tornado.ioloop.PeriodicCallback(scheduler.updateScheduler, 1000).start()
     logging.info("Starting robot updater!")
-    tornado.ioloop.PeriodicCallback(scheduler.update_robots, 1000).start()
+    tornado.ioloop.PeriodicCallback(scheduler.update_robots, 250).start()
     ioloop.start()
