@@ -15,6 +15,7 @@ import math
 location_deq = collections.deque(maxlen=10)
 imu_deq = collections.deque(maxlen=10)
 mag_deq = collections.deque(maxlen=10)
+grav_deq = collections.deque(maxlen=10)
 
 calibration_points = []
 calibrated = False
@@ -25,6 +26,10 @@ rmat = np.array([[0.0, 0.0, 0.0], [0.0, 0.0, 0.0], [0.0, 0.0, 0.0]])
 
 frame_offset = 0.0
 imu_offset = 0
+
+gvec = np.array([0.0, 0.0, -1.0])
+grav_data = np.array([0.0, 0.0, -1.0])
+rgrav = np.array([[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]])
 
 def project(point):
     v = point - pool_plane_origin
@@ -48,6 +53,27 @@ def handle_location(data):
         # Publish normalized data
         (data.point.x,data.point.y,data.point.z) = (final[0],final[1],final[2])
         location_pub.publish(data)
+
+def handle_grav(data):
+    grav_deq.append(data)
+    grav_data = np.array([data.x, data.y, data.z])
+    # we want to rotate grav_data onto gvec
+    a = grav_data
+    b = gvec
+
+    v = np.cross(a, b)
+    s = np.linalg.norm(a, b)
+    c = np.dot(a, b)
+
+    vx_mat = np.array( [
+        [0, -v[2], v[1]], 
+        [v[2], 0, -v[0]], 
+        [-v[1], v[0], 0]]  )
+
+    global rgrav
+    rgrav = np.eye(3) + vx_mat + ((1-c)/(s*s))*vx_mat
+
+
 
 def handle_imu(data):
     imu_deq.append(data)
@@ -87,7 +113,12 @@ def handle_mag(data):
     mag_deq.append(data)
 
     if calibrated:
-        heading = math.atan2(data.y, data.x) # [-pi, pi)
+
+        global rgrav
+        data_vec = np.array([data.x, data.y, data.z])
+        data_vec_w = rgrav.dot(data_vec)
+
+        heading = math.atan2(data_vec_w[1], data_vec_w[0]) # [-pi, pi)
         # if heading < 0:
             # heading += 2 * math.pi # [0, 2*pi)
         print("Raw heading: %4f" % heading)
@@ -295,4 +326,5 @@ if __name__ == "__main__":
     rospy.Subscriber("raw_waypoint", PointStamped, handle_waypoint)
     rospy.Subscriber("imu_topic/Euler", Euler, handle_imu)
     rospy.Subscriber("imu_topic/Magnetometer", Vector3, handle_mag)
+    rospy.Subscriber("imu_topic/GravityAcceleration", Vector3, handle_grav)
     rospy.spin()
