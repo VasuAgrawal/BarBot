@@ -7,13 +7,14 @@ import collections
 
 import rospy
 from barbot.msg import Euler
-from geometry_msgs.msg import PointStamped
+from geometry_msgs.msg import PointStamped, Vector3
 
 import numpy as np
 import math
 
 location_deq = collections.deque(maxlen=10)
 imu_deq = collections.deque(maxlen=10)
+mag_deq = collections.deque(maxlen=10)
 
 calibration_points = []
 calibrated = False
@@ -51,36 +52,52 @@ def handle_location(data):
 def handle_imu(data):
     imu_deq.append(data)
     
-    # If calibrated, convert this reading into a calibrated one and republish.
-    if calibrated:
-        heading = data.heading - imu_offset # degrees
-        heading = int(heading + 360) % 360 # convert to [0, 360)
-        print("Subtracting IMU Offset: ", heading, end=" ")
+    # # If calibrated, convert this reading into a calibrated one and republish.
+    # if calibrated:
+        # heading = data.heading - imu_offset # degrees
+        # heading = int(heading + 360) % 360 # convert to [0, 360)
+        # print("Subtracting IMU Offset: ", heading, end=" ")
 
-        # Multiply by pi/180, convert to radians
-        heading = math.radians(heading) # [0, 2*PI)
-        print("Converted to radians: ", heading, end=" ")
+        # # Multiply by pi/180, convert to radians
+        # heading = math.radians(heading) # [0, 2*PI)
+        # print("Converted to radians: ", heading, end=" ")
 
-        # Attempt to subtract the frame offset
-        heading -= frame_offset
-        print("Subtracted frame offset: ", heading, end=" ")
-        
-        # Set it back to the right range
-        heading += 2 * math.pi
-        heading %= 2 * math.pi # [0, 2*PI)
-        heading -= 1 * math.pi # looks nicer, in [-PI, PI)
-        print("Final heading: ", heading)
-
-        # heading = data.heading + imu_offset
-        # heading = int(heading) % 360
-        # heading = float(heading) / 180.0 * math.pi
-        # heading += math.pi / 2
+        # # Attempt to subtract the frame offset
         # heading -= frame_offset
-        # heading = heading % (2*math.pi)
-        # heading = (heading + math.pi) % (2*math.pi) - math.pi
+        # print("Subtracted frame offset: ", heading, end=" ")
+        
+        # # Set it back to the right range
+        # heading += 2 * math.pi
+        # heading %= 2 * math.pi # [0, 2*PI)
+        # heading -= 1 * math.pi # looks nicer, in [-PI, PI)
+        # print("Final heading: ", heading)
 
-        data.heading = heading
-        imu_pub.publish(data)
+        # # heading = data.heading + imu_offset
+        # # heading = int(heading) % 360
+        # # heading = float(heading) / 180.0 * math.pi
+        # # heading += math.pi / 2
+        # # heading -= frame_offset
+        # # heading = heading % (2*math.pi)
+        # # heading = (heading + math.pi) % (2*math.pi) - math.pi
+
+        # data.heading = heading
+        # imu_pub.publish(data)
+
+def handle_mag(data):
+    mag_deq.append(data)
+
+    if calibrated:
+        heading = math.atan2(data.y, data.x) # [-pi, pi)
+        print("Raw heading: %4f" % heading)
+        heading -= imu_offset 
+        print("imu off: %4f, minus imu off: %4f" % (imu_offset, heading))
+        heading -= frame_offset
+        print("frame off: %4f, minus frame off: %4f" % (frame_offset, heading))
+
+        imu_data = Euler()
+        imu_data.heading = heading
+        imu_pub.publish(imu_data)
+        
 
 def handle_waypoint(data):
     # If calibrated, convert this reading into a calibrated one and republish.
@@ -106,13 +123,16 @@ def average(iterable):
 
 
 class CalibrationPoint(object):
-    def __init__(self, x, y, z, roll, pitch, heading):
+    def __init__(self, x, y, z, roll, pitch, heading, mag_x, mag_y, mag_z):
         self.x = x
         self.y = y
         self.z = z
         self.roll = roll
         self.pitch = pitch
         self.heading = heading
+        self.mag_x = mag_x
+        self.mag_y = mag_y
+        self.mag_z = mag_z
 
 
 def handle_user_input():
@@ -159,13 +179,19 @@ def handle_user_input():
         avg_heading = average([data.heading for data in imu_data])
         avg_roll = average([data.roll for data in imu_data])
         avg_pitch = average([data.pitch for data in imu_data])
+        avg_mag_x = average([data.x for data in mag_data])
+        avg_mag_y = average([data.y for data in mag_data])
+        avg_mag_z = average([data.z for data in mag_data])
+
         rospy.loginfo("Calibration parameters at %s:\n"
                 "location: [x:    %f, y:     %f, z:       %f]\n"
-                "imu:      [roll: %f, pitch: %f, heading: %f]\n",
-                location, avg_x, avg_y, avg_z, avg_roll,
-                avg_pitch, avg_heading)
+                "imu:      [roll: %f, pitch: %f, heading: %f]\n"
+                "mag:      [x:    %f, y:     %f, z:       %f]\n",
+                location, avg_x, avg_y, avg_z,
+                avg_roll, avg_pitch, avg_heading,
+                avg_mag_x, avg_mag_y, avg_mag_z)
         calibration_points.append(CalibrationPoint(avg_x, avg_y, avg_z,
-            avg_roll, avg_pitch, avg_heading))
+            avg_roll, avg_pitch, avg_heading, avg_mag_x, avg_mag_y, avg_mag_z))
 
     # Compute information about the pool plane from calibration data
     # Use bottom left, top left, bottom right
@@ -207,12 +233,17 @@ def handle_user_input():
 
     global frame_offset
     frame_offset = math.acos(np.dot(projected_v2, np.array([1.0, 0.0, 0.0])) / 
-            (projected_v2_norm))
+            (projected_v2_norm)) # range [0, pi)
 
     global imu_offset
-    imu_offset = calibration_points[0].heading # SIGNS HERE!
+    # imu_offset = calibration_points[0].heading # SIGNS HERE!
+    # avg_mag_x = average([point.mag_x for point in calibration_points])
+    # avg_mag_y = average([point.mag_y for point in calibration_points])
+    mag_x = calibration_points[0].mag_x
+    mag_y = calibration_points[0].mag_y
+    imu_offset = math.atan2(mag_y, mag_x) # range [-pi, pi)
 
-    rospy.loginfo("Heading offset: %d\n", imu_offset)
+    rospy.loginfo("Heading offset: %f\n", imu_offset)
     rospy.loginfo("Frame offset: %f\n", frame_offset)
 
     global calibrated
@@ -238,4 +269,5 @@ if __name__ == "__main__":
     rospy.Subscriber("raw_location", PointStamped, handle_location)
     rospy.Subscriber("raw_waypoint", PointStamped, handle_waypoint)
     rospy.Subscriber("imu_topic/Euler", Euler, handle_imu)
+    rospy.Subscriber("imu_topic/Magnetometer", Vector3, handle_imu)
     rospy.spin()
