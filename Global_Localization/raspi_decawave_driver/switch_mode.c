@@ -44,7 +44,7 @@
 #ifdef DEBUG
 #define DEBUG_PRINT(x) printf x
 #else
-#define DEBUG_PRINT(x) do {} while(0)
+#define DEBUG_PRINT(x)
 #endif
 
 // Info print macro
@@ -55,7 +55,7 @@
 #endif
 
 // Inter-ranging delay period, in milliseconds.
-#define RNG_DELAY_MS 20
+#define RNG_DELAY_MS 10
 
 // Default antenna delay values for 64 MHz PRF.
 #define TX_ANT_DLY 16436
@@ -88,10 +88,10 @@
 // Speed of light in air, in metres per second.
 #define SPEED_OF_LIGHT 299702547
 
-// Frame delays
+// Frame delays and timeouts
 #define POLL_TX_TO_RESP_RX_DLY_UUS 150
-#define RESP_RX_TO_FINAL_TX_DLY_UUS 8000
-#define RESP_RX_TIMEOUT_UUS 10000
+#define RESP_RX_TO_FINAL_TX_DLY_UUS 9000
+#define RESP_RX_TIMEOUT_UUS 10800
 #define TDMA_DELAY 10
 
 // Distance regression information
@@ -101,7 +101,7 @@
 // Handling initialization of beacons
 #define NUM_BEACONS 7
 #define NUM_MEASUREMENTS 10
-#define NUM_ROUNDS 5
+#define NUM_ROUNDS 3
 
 // Default communication configuration. We use here EVK1000's default mode (mode 3).
 static dwt_config_t config = {
@@ -168,6 +168,8 @@ static std::string serverport = "8888";
 // Function Declarations
 static int computeDistanceInit();
 static int computeDistanceResp();
+static void switchMaster();
+static void switchMode();
 static int connect_to_server(std::string addr, std::string port);
 static uint64 get_tx_timestamp_u64(void);
 static uint64 get_rx_timestamp_u64(void);
@@ -182,27 +184,6 @@ static int validate_frame(uint8* frame, uint8 expected_type);
  * Application entry point.
  */
 int main(int argc, char *argv[]) {
-	// Read command line arguments
-	if (argc != 2) {
-		printf("Usage: [ID: 0, 1, 2, etc.]\n");
-		return -1;
-	}
-	else {
-        // Set device address
-        device_addr = atoi(argv[1]);
-
-        // Set master
-        if (device_addr == 0) {
-            is_master = true;
-        }
-        else {
-            is_master = false;
-        }
-	}
-
-    // Mode starts in initialization
-    mode = INITIALIZATION;
-
     // Start with board specific hardware init.
     raspiDecawaveInit();
 
@@ -241,26 +222,9 @@ int main(int argc, char *argv[]) {
     INFO_PRINT(("Beacon: Connected to server\n"));
 #endif // USING_SERVER
 
-    // Loop forever acting as a beacon
-    while (1) {
-        if (mode == INITIALIZATION) {
-        	// Wait for beacons to finish initializing
-            computeDistanceResp();
-        }
-        else if (mode == TRACKING) {
-            INFO_PRINT(("Entered tracking mode\n"));
-            deca_sleep(100 * (device_addr - NUM_BEACONS));
-            while(1) {
-                // Regularly ping the beacon network
-                for (uint8 target_addr = 0; target_addr < NUM_BEACONS; target_addr++) {
-                    set_msg_addresses(device_addr, target_addr);
-                    computeDistanceInit();
-                    deca_sleep(RNG_DELAY_MS);
-                }
-                deca_sleep(500);
-            }
-        }
-    }
+    // Send the mode switch message
+    switchMode();
+    return 0;
 }
 
 /**
@@ -359,7 +323,7 @@ static int computeDistanceInit() {
  */
 static int computeDistanceResp() {
     // Clear reception timeout to start next ranging process.
-    dwt_setrxtimeout(0);
+    dwt_setrxtimeout(5*RESP_RX_TIMEOUT_UUS);
 
     // Activate reception immediately.
     dwt_rxenable(DWT_START_RX_IMMEDIATE);
@@ -368,6 +332,14 @@ static int computeDistanceResp() {
     while (!((status_reg = dwt_read32bitreg(SYS_STATUS_ID)) & (SYS_STATUS_RXFCG | SYS_STATUS_ALL_RX_TO | SYS_STATUS_ALL_RX_ERR)));
 
     if (status_reg & SYS_STATUS_RXFCG) {
+        DEBUG_PRINT(("Rx\n"));
+        if (was_previous_master == true) {
+            // Can assume that if we received a frame, master has been successfully passed on
+            was_previous_master = false;
+            // Update count of rounds
+            rounds++;
+        }
+
         uint32 frame_len;
 
         // Clear good RX frame event in the DW1000 status register.
@@ -379,11 +351,145 @@ static int computeDistanceResp() {
             dwt_readrxdata(rx_buffer, frame_len, 0);
         }
 
-        // Validate the requested type of frame to process appropriately. Wait for a mode switch
-        if (validate_frame(rx_buffer, MSG_TYPE_MODE_SWITCH) == 0) {
-            DEBUG_PRINT(("Rx mode switch\n"));
+        // Validate the requested type of frame to process appropriately.
+        if (validate_frame(rx_buffer, MSG_TYPE_POLL) == 0) {
+            DEBUG_PRINT(("Rx init\n"));
+            int ret;
+
+            // Retrieve poll reception timestamp.
+            poll_rx_ts = get_rx_timestamp_u64();
+
+            // Write and send the response message.
+            tx_resp_msg[MSG_DEST_ADDR_IDX] = rx_buffer[MSG_SRC_ADDR_IDX];
+            tx_resp_msg[MSG_DEST_ADDR_IDX+1] = rx_buffer[MSG_SRC_ADDR_IDX];
+            dwt_writetxdata(sizeof(tx_resp_msg), tx_resp_msg, 0); // Zero offset in TX buffer.
+            dwt_writetxfctrl(sizeof(tx_resp_msg), 0, 1); // Zero offset in TX buffer, ranging.
+
+            // Perform TDMA on the beacon side
+            //if (mode == TRACKING) {
+            //    deca_sleep(TDMA_DELAY * device_addr);
+            //}
+            ret = dwt_starttx(DWT_START_TX_IMMEDIATE);
+
+            // If dwt_starttx() returns an error, abandon this ranging exchange and proceed to the next one.
+            if (ret == DWT_ERROR) {
+                INFO_PRINT(("Error transmitting response frame\n"));
+                return -1;
+            }
+
+            return 0;
+        }
+        // Check that the frame is a final message sent by "DS TWR initiator" example.
+        else if (validate_frame(rx_buffer, MSG_TYPE_FINAL) == 0) {
+            DEBUG_PRINT(("Rx final\n"));
+            uint32 poll_tx_ts, resp_rx_ts, final_tx_ts;
+            uint32 poll_rx_ts_32, resp_tx_ts_32, final_rx_ts_32;
+            double Ra, Rb, Da, Db;
+            int64 tof_dtu;
+
+            // Retrieve response transmission and final reception timestamps.
+            resp_tx_ts = get_tx_timestamp_u64();
+            final_rx_ts = get_rx_timestamp_u64();
+
+            // Get timestamps embedded in the final message.
+            final_msg_get_ts(&rx_buffer[FINAL_MSG_POLL_TX_TS_IDX], &poll_tx_ts);
+            final_msg_get_ts(&rx_buffer[FINAL_MSG_RESP_RX_TS_IDX], &resp_rx_ts);
+            final_msg_get_ts(&rx_buffer[FINAL_MSG_FINAL_TX_TS_IDX], &final_tx_ts);
+            
+            // Compute time of flight. 32-bit subtractions give correct answers even if clock has wrapped.
+            poll_rx_ts_32 = (uint32)poll_rx_ts;
+            resp_tx_ts_32 = (uint32)resp_tx_ts;
+            final_rx_ts_32 = (uint32)final_rx_ts;
+            Ra = (double)(resp_rx_ts - poll_tx_ts);
+            Rb = (double)(final_rx_ts_32 - resp_tx_ts_32);
+            Da = (double)(final_tx_ts - resp_rx_ts);
+            Db = (double)(resp_tx_ts_32 - poll_rx_ts_32);
+            tof_dtu = (int64)((Ra * Rb - Da * Db) / (Ra + Rb + Da + Db));
+
+            tof = tof_dtu * DWT_TIME_UNITS;
+            distance = tof * SPEED_OF_LIGHT;
+
+            // Apply regression
+            distance = X_COEFF*distance + Y_INTERCEPT;
+
+#ifdef USING_SERVER
+            // Transmit distance to server
+            DwDistance distProto = DwDistance_init_default;
+            uint8_t buffer[DwDistance_size];
+            pb_ostream_t stream = pb_ostream_from_buffer(buffer, sizeof(buffer));
+
+            DwDistance distProtoSym = DwDistance_init_default;
+            uint8_t bufferSym[DwDistance_size];
+            pb_ostream_t streamSym = pb_ostream_from_buffer(bufferSym, sizeof(bufferSym));
+
+            // Fill out fields in proto
+            distProto.dist = distance;
+            distProto.send_id = device_addr;
+            distProto.recv_id = rx_buffer[MSG_SRC_ADDR_IDX];
+            distProto.beacon = true;
+
+            distProtoSym.dist = distance;
+            distProtoSym.send_id = rx_buffer[MSG_SRC_ADDR_IDX];
+            distProtoSym.recv_id = device_addr;
+            distProtoSym.beacon = false;
+
+            // Serialize proto and encode size into header for sending to server
+            pb_encode(&stream, DwDistance_fields, &distProto);
+            uint32_t byte_size = stream.bytes_written;
+            uint8_t *bytes = new uint8_t[4 + byte_size];
+
+            pb_encode(&streamSym, DwDistance_fields, &distProtoSym);
+            uint32_t byte_sizeSym = streamSym.bytes_written;
+            uint8_t *bytesSym = new uint8_t[4 + byte_sizeSym];
+
+            // Little endian encoding of packet size
+            bytes[0] = (byte_size >> 0) & 0xFF;
+            bytes[1] = (byte_size >> 8) & 0xFF;
+            bytes[2] = (byte_size >> 16) & 0xFF;
+            bytes[3] = (byte_size >> 24) & 0xFF;
+
+            bytesSym[0] = (byte_sizeSym >> 0) & 0xFF;
+            bytesSym[1] = (byte_sizeSym  >> 8) & 0xFF;
+            bytesSym[2] = (byte_sizeSym >> 16) & 0xFF;
+            bytesSym[3] = (byte_sizeSym >> 24) & 0xFF;
+
+            for (int i = 0; i < byte_size; i++) {
+                bytes[i+4] = buffer[i];
+            }
+
+            for (int i = 0; i < byte_sizeSym; i++) {
+                bytesSym[i+4] = bufferSym[i];
+            }
+
+            // Attempt to send the array over the socket
+            if (write(serverfd, bytes, 4 + byte_size) < 0) {
+                INFO_PRINT(("Error in writing to socket!\n"));
+            }
+
+            if (mode == TRACKING) {
+                if (write(serverfd, bytesSym, 4 + byte_sizeSym) < 0) {
+                    INFO_PRINT(("Error in writing to socket!\n"));
+                }
+            }
+
+            delete[] bytes;
+            delete[] bytesSym;
+#endif // USING_SERVER
+
+            INFO_PRINT(("%3.2f\n", distance));
+            return 0;
+        }
+        else if (validate_frame(rx_buffer, MSG_TYPE_MASTER_SWITCH) == 0) {
+            DEBUG_PRINT(("Rx switch\n"));
+            // Switch to master mode
+            is_master = true;
+            deca_sleep(100);
+
+            return 0;
+        }
+        else if (validate_frame(rx_buffer, MSG_TYPE_MODE_SWITCH) == 0) {
             // Switch to tracking mode
-            mode = TRACKING;
+            mode = TRACKING; 
             return 0;
         }
     }
@@ -394,9 +500,58 @@ static int computeDistanceResp() {
 
         // Set RX to properly reinitialise LDE operation.
         dwt_rxreset();
+
+        if (was_previous_master == true) {
+            // Try the switch again
+            switchMaster();
+        }
     }
 
     return -1;
+}
+
+static void switchMaster() {
+    INFO_PRINT(("Switching master\n"));
+    
+    // Select next master - cycling backwards
+    uint8 next_master = (device_addr - 1 + NUM_BEACONS) % NUM_BEACONS;
+    set_msg_addresses(device_addr, next_master);
+
+    was_previous_master = true;
+
+    // Send message to indicate that next master must become master
+    dwt_writetxdata(sizeof(master_switch_msg), master_switch_msg, 0);
+    dwt_writetxfctrl(sizeof(master_switch_msg), 0, 0);
+    int ret = dwt_starttx(DWT_START_TX_IMMEDIATE);
+
+    if (ret == DWT_SUCCESS) {
+        // Poll DW1000 until TX frame sent event set. See NOTE 9 below.
+        while (!(dwt_read32bitreg(SYS_STATUS_ID) & SYS_STATUS_TXFRS));
+
+        // Clear TXFRS event.
+        dwt_write32bitreg(SYS_STATUS_ID, SYS_STATUS_TXFRS);
+    }
+
+    is_master = false;
+}
+
+static void switchMode() {
+    INFO_PRINT(("Telling beacons to switch mode\n"));
+
+    switch_msg_set_sys_time();
+
+    // Send message to indicate that all beacons must switch to tracking mode
+    dwt_writetxdata(sizeof(mode_switch_msg), mode_switch_msg, 0);
+    dwt_writetxfctrl(sizeof(mode_switch_msg), 0, 0);
+    int ret = dwt_starttx(DWT_START_TX_IMMEDIATE);
+
+    if (ret == DWT_SUCCESS) {
+        // Poll DW1000 until TX frame sent event set
+        while (!(dwt_read32bitreg(SYS_STATUS_ID) & SYS_STATUS_TXFRS));
+
+        // Clear TXFRS event
+        dwt_write32bitreg(SYS_STATUS_ID, SYS_STATUS_TXFRS);
+    }
 }
 
 /**
@@ -543,38 +698,38 @@ static void switch_msg_get_sys_time(const uint8 *rx_buf, struct timeval *tv) {
  * Update the addreses of each message when we change targets
  */
 static void set_msg_addresses(uint8 master_addr, uint8 slave_addr) {
-	// Poll message addresses
-	tx_poll_msg[MSG_SRC_ADDR_IDX] = master_addr;
-	tx_poll_msg[MSG_SRC_ADDR_IDX+1] = master_addr;
-	tx_poll_msg[MSG_DEST_ADDR_IDX] = slave_addr;
-	tx_poll_msg[MSG_DEST_ADDR_IDX+1] = slave_addr;
+    // Poll message addresses
+    tx_poll_msg[MSG_SRC_ADDR_IDX] = master_addr;
+    tx_poll_msg[MSG_SRC_ADDR_IDX+1] = master_addr;
+    tx_poll_msg[MSG_DEST_ADDR_IDX] = slave_addr;
+    tx_poll_msg[MSG_DEST_ADDR_IDX+1] = slave_addr;
 
-	rx_poll_msg[MSG_SRC_ADDR_IDX] = master_addr;
-	rx_poll_msg[MSG_SRC_ADDR_IDX+1] = master_addr;
-	rx_poll_msg[MSG_DEST_ADDR_IDX] = slave_addr;
-	rx_poll_msg[MSG_DEST_ADDR_IDX+1] = slave_addr;
+    rx_poll_msg[MSG_SRC_ADDR_IDX] = master_addr;
+    rx_poll_msg[MSG_SRC_ADDR_IDX+1] = master_addr;
+    rx_poll_msg[MSG_DEST_ADDR_IDX] = slave_addr;
+    rx_poll_msg[MSG_DEST_ADDR_IDX+1] = slave_addr;
 
-	// Response message addresses
-	tx_resp_msg[MSG_SRC_ADDR_IDX] = slave_addr;
-	tx_resp_msg[MSG_SRC_ADDR_IDX+1] = slave_addr;
-	tx_resp_msg[MSG_DEST_ADDR_IDX] = master_addr;
-	tx_resp_msg[MSG_DEST_ADDR_IDX+1] = master_addr;
+    // Response message addresses
+    tx_resp_msg[MSG_SRC_ADDR_IDX] = slave_addr;
+    tx_resp_msg[MSG_SRC_ADDR_IDX+1] = slave_addr;
+    tx_resp_msg[MSG_DEST_ADDR_IDX] = master_addr;
+    tx_resp_msg[MSG_DEST_ADDR_IDX+1] = master_addr;
 
-	rx_resp_msg[MSG_SRC_ADDR_IDX] = slave_addr;
-	rx_resp_msg[MSG_SRC_ADDR_IDX+1] = slave_addr;
-	rx_resp_msg[MSG_DEST_ADDR_IDX] = master_addr;
-	rx_resp_msg[MSG_DEST_ADDR_IDX+1] = master_addr;
+    rx_resp_msg[MSG_SRC_ADDR_IDX] = slave_addr;
+    rx_resp_msg[MSG_SRC_ADDR_IDX+1] = slave_addr;
+    rx_resp_msg[MSG_DEST_ADDR_IDX] = master_addr;
+    rx_resp_msg[MSG_DEST_ADDR_IDX+1] = master_addr;
 
-	// Final message addresses
-	tx_final_msg[MSG_SRC_ADDR_IDX] = master_addr;
-	tx_final_msg[MSG_SRC_ADDR_IDX+1] = master_addr;
-	tx_final_msg[MSG_DEST_ADDR_IDX] = slave_addr;
-	tx_final_msg[MSG_DEST_ADDR_IDX+1] = slave_addr;
+    // Final message addresses
+    tx_final_msg[MSG_SRC_ADDR_IDX] = master_addr;
+    tx_final_msg[MSG_SRC_ADDR_IDX+1] = master_addr;
+    tx_final_msg[MSG_DEST_ADDR_IDX] = slave_addr;
+    tx_final_msg[MSG_DEST_ADDR_IDX+1] = slave_addr;
 
-	rx_final_msg[MSG_SRC_ADDR_IDX] = master_addr;
-	rx_final_msg[MSG_SRC_ADDR_IDX+1] = master_addr;
-	rx_final_msg[MSG_DEST_ADDR_IDX] = slave_addr;
-	rx_final_msg[MSG_DEST_ADDR_IDX+1] = slave_addr;
+    rx_final_msg[MSG_SRC_ADDR_IDX] = master_addr;
+    rx_final_msg[MSG_SRC_ADDR_IDX+1] = master_addr;
+    rx_final_msg[MSG_DEST_ADDR_IDX] = slave_addr;
+    rx_final_msg[MSG_DEST_ADDR_IDX+1] = slave_addr;
 
     // Switch message addresses
     master_switch_msg[MSG_SRC_ADDR_IDX] = master_addr;
@@ -587,14 +742,14 @@ static void set_msg_addresses(uint8 master_addr, uint8 slave_addr) {
  * Validates the frame against the fixed parameters, as well as the expected type of frame
  */
 static int validate_frame(uint8* frame, uint8 expected_type) {
-	// Validate frame control bytes
-	if ((frame[0] != 0x41) || (frame[1] != 0x88)) {
-		return -1;
-	}
-	/// Validate PAN ID
-	if ((frame[2] != 0xCA) || (frame[3] != 0xDE)) {
-		return -1;
-	}
+    // Validate frame control bytes
+    if ((frame[0] != 0x41) || (frame[1] != 0x88)) {
+        return -1;
+    }
+    /// Validate PAN ID
+    if ((frame[2] != 0xCA) || (frame[3] != 0xDE)) {
+        return -1;
+    }
     // Validate that the message is of the expected type
     if (frame[MSG_TYPE_IDX] != expected_type) {
         return -1;
@@ -608,11 +763,11 @@ static int validate_frame(uint8* frame, uint8 expected_type) {
     //if (mode == TRACKING) {
     //    return 0;
     //}
-	// Otherwise, Validate that message is intended for this device
-	if ((frame[MSG_DEST_ADDR_IDX] != device_addr) || (frame[MSG_DEST_ADDR_IDX+1] != device_addr)) {
-		return -1;
-	}
-	return 0;
+    // Otherwise, Validate that message is intended for this device
+    if ((frame[MSG_DEST_ADDR_IDX] != device_addr) || (frame[MSG_DEST_ADDR_IDX+1] != device_addr)) {
+        return -1;
+    }
+    return 0;
 }
 
 /*****************************************************************************************************************************************************
