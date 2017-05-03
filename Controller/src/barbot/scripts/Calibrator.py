@@ -19,8 +19,6 @@ mag_deq = collections.deque(maxlen=10)
 calibration_points = []
 calibrated = False
 
-pool_plane_origin = np.array([0.0, 0.0, 0.0])
-pool_plane_normal = np.array([0.0, 0.0, 0.0])
 rmat = np.array([[0.0, 0.0, 0.0], [0.0, 0.0, 0.0], [0.0, 0.0, 0.0]])
 
 frame_offset = 0.0
@@ -34,6 +32,31 @@ def project(point):
     final[2] = 0
     return final
 
+def compute_projection(p0, p1, p2):
+    # Frame of physical pool
+    v1 = np.array([1.0, 0.0, 0.0])
+    v2 = np.array([0.0, 1.0, 0.0])
+    v3 = np.array([0.0, 0.0, 1.0])
+
+    v = np.transpose(np.vstack((v1, v2, v3)))
+
+    # Frame of global localization points
+    w1 = np.array([p1.x-p0.x, p1.y-p0.y, p1.z-p0.z])
+    w1 = w1 / np.linalg.norm(w1)
+    temp = np.array([p2.x-p0.x, p2.y-p0.y, p2.z-p0.z])
+    temp = temp / np.linalg.norm(temp)
+    w3 = cross(w1, temp)
+    w2 = cross(w3, w1)
+
+    w = np.transpose(np.vstack((w1, w2, w3)))
+
+    # Use SVD to compute rotation matrix from w to v
+    B = dot(v, np.transpose(w))
+    U, S, V = np.linalg.svd(B)
+    M = np.diag([1.0, 1.0, np.linalg.det(U)*np.linalg.det(V)])
+    rmat = U * M * np.transpose(V)
+
+    return rmat
 
 def handle_location(data):
     location_deq.append(data)
@@ -222,32 +245,7 @@ def handle_user_input():
     p1 = calibration_points[1]
     p2 = calibration_points[3]
 
-    # Use bottom left calibration point as origin of pool plane
-    global pool_plane_origin
-    pool_plane_origin = np.array([p0.x, p0.y, p0.z])
-
-    # Compute normal of the pool plane
-    v1 = np.array([p1.x-p0.x, p1.y-p0.y, p1.z-p0.z])
-    v2 = np.array([p2.x-p0.x, p2.y-p0.y, p2.z-p0.z])
-    global pool_plane_normal
-    pool_plane_normal = np.cross(v1, v2) / np.linalg.norm(np.cross(v1, v2))
-
-    # Compute rotation matrix of pool plane from Z axis
-    # http://stackoverflow.com/questions/9423621/3d-rotations-of-a-plane
-    M = pool_plane_normal # Normal vector to pool plane
-    N = np.array([0.0, 0.0, 1.0]) # Normal vector to plane I am rotating to (XY)
-    costheta = np.dot(M, N) / (np.linalg.norm(M) * np.linalg.norm(N))
-    axis = np.cross(M, N) / np.linalg.norm(np.cross(M, N))
-
-    c = costheta
-    s = math.sqrt(1-c*c)
-    C = 1-c
-    (x, y, z) = (axis[0], axis[1], axis[2])
-
-    global rmat
-    rmat = np.array([[x*x*C+c,   x*y*C-z*s, x*z*C+y*s],
-                    [y*x*C+z*s, y*y*C+c,   y*z*C-x*s],
-                    [z*x*C-y*s, z*y*C+x*s, z*z*C+c  ]])
+    rmat = compute_projection(p0, p1, p2)
 
     # Compute rotation between GLS frame and pool frame
     # v2 is from bottom left to bottom right - treat this as x axis
