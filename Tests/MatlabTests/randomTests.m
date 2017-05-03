@@ -1,15 +1,16 @@
-numTests = 1000;
-for i = 0:numTests
-    testPoint = rand([3,1])*15; % test point between 0-1
-   
-    rotation = rand([3,1])*6*pi - 2*pi; % rotation between -2pi - 4pi
-    
-    outputPoint = Project(testPoint, rotation);
-    if abs(testPoint - outputPoint) > 0.0001
-        fprintf('Test %d failed!', i);
-        testPoint
-        rotation
-        outputPoint
-    end
-end
+p0 = [0; 0; 0];
+p1 = [10; 0; 0];
+p2 = [0; 10; 0];
 
+rotation = [pi/4, pi/4, pi/4];
+
+p0_gls = rotate3D(p0, rotation);
+p1_gls = rotate3D(p1, rotation);
+p2_gls = rotate3D(p2, rotation);
+
+rmat = Project(p0_gls, p1_gls, p2_gls);
+
+ptest = [5; 5; 1];
+ptest_gls = rotate3D(ptest, rotation);
+
+ptest_projected = rmat * ptest_gls

@@ -12,5 +12,6 @@ def rotate3D(point, x, y, z):
               [math.sin(z), math.cos(z), 0],
               [0, 0, 1]])
 
-    rotated_point = rmat_x * rmat_y * rmat_z * point
+    npPoint = np.array([[point[0]], [point[1]], [point[2]]])
+    rotated_point = rmat_x * rmat_y * rmat_z * npPoint
     return rotated_point
