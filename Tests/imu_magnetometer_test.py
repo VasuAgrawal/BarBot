@@ -12,6 +12,10 @@ bno = BNO055.BNO055(serial_port='/dev/ttyAMA0', rst=18)
 if len(sys.argv) == 2 and sys.argv[1].lower() == '-v':
     logging.basicConfig(level=logging.DEBUG)
 
+# Initialize the BNO055 and stop if something went wrong.
+if not bno.begin():
+    raise RuntimeError('Failed to initialize BNO055! Is the sensor connected?')
+
 # Print system status and self test result.
 status, self_test, error = bno.get_system_status()
 print('System status: {0}'.format(status))
@@ -37,17 +41,21 @@ while True:
     # Magnetometer data (in micro-Teslas):
     x,y,z = bno.read_magnetometer()
 
-    print('Heading={0:0.2F} Roll={1:0.2F} Pitch={2:0.2F}\tMagX={3:0.4f} MagY={4:0.4f} MagZ={5:0.4f}'.format(
-          heading, roll, pitch, x, y, z))
+    #print('Heading={0:0.2F} Roll={1:0.2F} Pitch={2:0.2F}\tMagX={3:0.4f} MagY={4:0.4f} MagZ={5:0.4f}'.format(
+    #      heading, roll, pitch, x, y, z))
 
     # Compute compass heading
+    """
     if (y > 0):
-    	compassHeading = 90 - atan2(x,y)*180/math.pi
+    	compassHeading = 90 - math.atan2(x,y)*180/math.pi
     elif (y < 0):
-    	compassHeading = 270 - atan2(x,y)*180/math.pi
+    	compassHeading = 270 - math.atan2(x,y)*180/math.pi
     elif ((y == 0) and (x < 0)):
     	compassHeading = 180
     else:
     	compassHeading = 0
+    """
 
-   	print('Compass Heading = {0}'.format(compassHeading))
+    compassHeading = math.atan2(y,x);
+
+    print('Compass Heading = {0}'.format(compassHeading))
