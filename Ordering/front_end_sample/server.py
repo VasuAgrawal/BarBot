@@ -138,31 +138,27 @@ class CustomerHandler(PostgresHandler):
         self.render("static/html/customer.html", drinks=drinks, orders=currentOrders)
 
 class MenuHandler(PostgresHandler):
-    @tornado.web.authenticated
     @tornado.gen.coroutine
     def post(self):
-        user = self.get_current_user()
-        if(user not in self.application.bartender):
+        
+        id = self.get_argument("drinkId", default=None)
+        if(id):
+            id = int(id)
+            sql = """
+                    DELETE FROM drinks WHERE id = %s;
+                """
+            cursor = yield self.db().execute(sql, (id, ))
+            self.redirect("/bartender/")
+        drinkType = self.get_argument("drinkType", default=None)
+        price = self.get_argument("price", default=None)
+        if(drinkType and price):
+            drinkType = str(drinkType)
+            price = float(price)
+            sql = """ INSERT INTO drinks(name, price)
+                      VALUES(%s, %s)
+                """
+            cursor = yield self.db().execute(sql, (drinkType, price))
             self.redirect("/")
-        else:
-            id = self.get_argument("drinkId", default=None)
-            if(id):
-                id = int(id)
-                sql = """
-                        DELETE FROM drinks WHERE id = %s;
-                    """
-                cursor = yield self.db().execute(sql, (id, ))
-                self.redirect("/bartender/")
-            drinkType = self.get_argument("drinkType", default=None)
-            price = self.get_argument("price", default=None)
-            if(drinkType and price):
-                drinkType = str(drinkType)
-                price = float(price)
-                sql = """ INSERT INTO drinks(name, price)
-                          VALUES(%s, %s)
-                    """
-                cursor = yield self.db().execute(sql, (drinkType, price))
-                self.redirect("/")
 
 class BartenderHandler(PostgresHandler):
     @tornado.gen.coroutine
@@ -219,6 +215,20 @@ class BartenderHandler(PostgresHandler):
             """
             cursor = yield self.db().execute(sql, (id, ))
         self.redirect("/")
+
+class ApiDrinksHandler(PostgresHandler):
+    @tornado.gen.coroutine
+    def get(self):
+        sql = """
+            SELECT name, price
+            FROM drinks
+        """
+        cursor = yield self.db().execute(sql)
+        drinks = cursor.fetchall()
+        result = ''
+        for drink in drinks:
+            result += str(drink[0]) + " " + str(drink[1]) + ","
+        self.write(result)
 
 # cancel an order
 class ApiCancelHandler(PostgresHandler):
@@ -391,7 +401,8 @@ class BarBotApplication(tornado.web.Application):
             (r"/login/?", LoginHandler),
             (r"/register/?", RegisterHandler),
             (r"/about/?", AboutHandler),
-            (r"/logout/?", LogoutHandler)
+            (r"/logout/?", LogoutHandler),
+            (r"/drinks/", ApiDrinksHandler)
         ]
 
         settings = {
