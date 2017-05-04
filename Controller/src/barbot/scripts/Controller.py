@@ -71,11 +71,11 @@ class Controller(object):
             self.error_var.set(math.sqrt(distance2))
 
             if (distance2 > self.threshold*self.threshold):
-                goal_theta = math.atan2(err_y, -err_x)
-                # goal_theta = math.atan2(err_x, err_y)
-                # theta_error = ((goal_theta - state.theta) + math.pi) % (2*math.pi) - math.pi
-                theta_error = (((goal_theta - state.theta + math.pi) + 2*math.pi) %
-                                (2*math.pi))
+                goal_theta = math.atan2(err_y, err_x)
+                
+                theta_error = goal_theta - state.theta # [-2pi, pi]
+                theta_error = (theta_error + 2*math.pi) % (2*math.pi) # [0, 2pi]
+                
                 if theta_error > math.pi:
                     theta_error -= 2*math.pi
 
