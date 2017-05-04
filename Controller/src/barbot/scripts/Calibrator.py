@@ -85,15 +85,22 @@ def handle_waypoint(data):
 
     # If calibrated, convert this reading into a calibrated one and republish.
     if calibrated:
-        point = np.array([[data.point.x], [data.point.y], [data.point.z]])
+        if data.point.x == 0 and data.point.y == 0 and data.point.z == 0:
+            # Force it to go back to the gls origin rather than global origin
+            data.point.x = gls_origin[0][0]
+            data.point.y = gls_origin[0][1]
+            data.point.z = gls_origin[0][2]
+        else:
+            point = np.array([[data.point.x], [data.point.y], [data.point.z]])
 
-        # Apply transformation from GLS frame to pool frame
-        # First subtract translation offset and apply rotation
-        projected = rmat.dot(point - gls_origin)
+            # Apply transformation from GLS frame to pool frame
+            # First subtract translation offset and apply rotation
+            projected = rmat.dot(point - gls_origin)
 
-        # Publish normalized data
-        (data.point.x, data.point.y, data.point.z) = (projected[0][0], projected[1][0], projected[2][0])
-        waypoint_pub.publish(data) 
+            # Publish normalized data
+            (data.point.x, data.point.y, data.point.z) = (projected[0][0], projected[1][0], projected[2][0])
+
+        waypoint_pub.publish(data)
 
 # def handle_grav(data):
 #     grav_deq.append(data)
