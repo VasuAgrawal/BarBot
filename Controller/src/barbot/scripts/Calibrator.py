@@ -20,7 +20,8 @@ grav_deq = collections.deque(maxlen=10)
 calibration_points = []
 calibrated = False
 
-rmat = np.array([[0.0, 0.0, 0.0], [0.0, 0.0, 0.0], [0.0, 0.0, 0.0]])
+gls_origin = None
+rmat = None
 
 frame_offset = 0.0
 imu_offset = 0
@@ -43,23 +44,32 @@ def compute_projection(p0, p1, p2):
     v2 = np.array([0.0, 1.0, 0.0])
     v3 = np.array([0.0, 0.0, 1.0])
 
-    v = np.transpose(np.vstack((v1, v2, v3)))
-
     # Frame of global localization points
-    w1 = np.array([p1.x-p0.x, p1.y-p0.y, p1.z-p0.z])
+    # X axis, measured from p1 to p0
+    w1 = np.array([p1[0]-p0[0], p1[1]-p0[1], p1[2]-p0[2]])
     w1 = w1 / np.linalg.norm(w1)
-    temp = np.array([p2.x-p0.x, p2.y-p0.y, p2.z-p0.z])
-    temp = temp / np.linalg.norm(temp)
-    w3 = cross(w1, temp)
-    w2 = cross(w3, w1)
+    w1 = np.array([w1[0][0], w1[1][0], w1[2][0]])
 
+    # Temporary "y axis", measured from p2 to p0
+    temp = np.array([p2[0]-p0[0], p2[1]-p0[1], p2[2]-p0[2]])
+    temp = temp / np.linalg.norm(temp)
+    temp = np.array([temp[0][0], temp[1][0], temp[2][0]])
+    
+    # Z axis, orthogonal to X axis
+    w3 = np.cross(np.transpose(w1), np.transpose(temp))
+    
+    # Y axis, orthogonal to both X and Z axis
+    w2 = np.cross(w3, w1)
+
+    # Matrices representing frames in pool (v) and GLS (w) space
+    v = np.transpose(np.vstack((v1, v2, v3)))
     w = np.transpose(np.vstack((w1, w2, w3)))
 
     # Use SVD to compute rotation matrix from w to v
-    B = dot(v, np.transpose(w))
+    B = np.dot(v, np.transpose(w))
     U, S, V = np.linalg.svd(B)
     M = np.diag([1.0, 1.0, np.linalg.det(U)*np.linalg.det(V)])
-    rmat = U * M * np.transpose(V)
+    rmat = np.dot(np.dot(U, M), V)
 
     return rmat
 
@@ -68,13 +78,14 @@ def handle_location(data):
 
     # If calibrated, convert this reading into a calibrated one and republish.
     if calibrated:
-        # Project uncalibrated location onto the pool plane
-        # http://stackoverflow.com/questions/9605556/how-to-project-a-3d-point-to-a-3d-plane
-        raw = np.array([data.point.x, data.point.y, data.point.z])
-        final = project(raw)
+        point = np.array([[data.point.x], [data.point.y], [data.point.z]])
+
+        # Apply transformation from GLS frame to pool frame
+        # First subtract translation offset and apply rotation
+        projected = rmat.dot(point - gls_origin)
 
         # Publish normalized data
-        (data.point.x,data.point.y,data.point.z) = (final[0],final[1],final[2])
+        (data.point.x, data.point.y, data.point.z) = (projected[0][0], projected[1][0], projected[2][0])
         location_pub.publish(data)
 
 def handle_grav(data):
@@ -191,7 +202,6 @@ def average(iterable):
         return sum(iterable) / len(iterable)
     return 0
 
-
 class CalibrationPoint(object):
     def __init__(self, x, y, z, roll, pitch, heading, mag_x, mag_y, mag_z):
         self.x = x
@@ -203,7 +213,6 @@ class CalibrationPoint(object):
         self.mag_x = mag_x
         self.mag_y = mag_y
         self.mag_z = mag_z
-
 
 def handle_user_input():
     instructions = ("Move the robot to the %s corner, pointing towards" +
@@ -276,7 +285,18 @@ def handle_user_input():
     p1 = calibration_points[1]
     p2 = calibration_points[3]
 
-    rmat = compute_projection(p0, p1, p2)
+    # Compute points in GLS frame, in numpy array column vector format
+    p0_gls = np.array([[p0.x], [p0.y], [p0.z]])
+    p1_gls = np.array([[p1.x], [p1.y], [p1.z]])
+    p2_gls = np.array([[p2.x], [p2.y], [p2.z]])
+
+    # Set origin of GLS frame
+    global gls_origin
+    gls_origin = p0_gls
+
+    # Compute rotation matrix from GLS frame to pool frame
+    global rmat
+    rmat = compute_projection(p0_gls, p1_gls, p2_gls)
 
     # Compute rotation between GLS frame and pool frame
     # v2 is from bottom left to bottom right - treat this as x axis

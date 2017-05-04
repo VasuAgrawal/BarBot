@@ -37,8 +37,9 @@ def compute_projection(p0, p1, p2):
     return rmat
 
 # Projects a point from the GLS frame to the global frame
-def project(point, rmat):
-    return rmat.dot(point)
+def project(point, rmat, origin):
+    # Subtract origin from the point to account for frame translation
+    return rmat.dot(point - origin)
 
 """
 def project(point, rotation):
@@ -102,9 +103,15 @@ def main2():
 
     # Apply transformation to get calibration points into GLS frame
     rotation = [math.pi/4, math.pi/4, math.pi/4]
+    translation = np.array([[1.25], [5.23], [6.41]])
+
     p0_gls = rotate3D(p0, *rotation)
     p1_gls = rotate3D(p1, *rotation)
     p2_gls = rotate3D(p2, *rotation)
+
+    p0_gls += translation
+    p1_gls += translation
+    p2_gls += translation
 
     # Compute transform from GLS frame to pool frame
     rmat = compute_projection(p0_gls, p1_gls, p2_gls)
@@ -112,9 +119,10 @@ def main2():
     # Project test point using same rotation into GLS frame
     ptest = [5, 5, 1]
     ptest_gls = rotate3D(ptest, *rotation)
+    ptest_gls += translation
 
     # Apply projection to test point
-    ptest_projected = project(ptest_gls, rmat)
+    ptest_projected = project(ptest_gls, rmat, p0_gls)
 
     print("Test point in pool frame:")
     print(ptest)
