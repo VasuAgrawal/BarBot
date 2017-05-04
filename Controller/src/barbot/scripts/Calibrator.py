@@ -79,27 +79,42 @@ def handle_location(data):
         (data.point.x, data.point.y, data.point.z) = (projected[0][0], projected[1][0], projected[2][0])
         location_pub.publish(data)
 
-def handle_grav(data):
-    grav_deq.append(data)
-    grav_data = np.array([data.x, data.y, data.z])
-    norm = np.linalg.norm(grav_data)
+def handle_waypoint(data):
+    location_deq.append(data)
 
-    phi = math.asin(data.x / norm)
-    cphi = math.cos(phi)
-    sphi = math.sin(phi)
+    # If calibrated, convert this reading into a calibrated one and republish.
+    if calibrated:
+        point = np.array([[data.point.x], [data.point.y], [data.point.z]])
 
-    theta = math.atan2(data.y / (-data.x*cphi), data.z / (data.x*cphi))
-    ctheta = math.cos(theta)
-    stheta = math.sin(theta)
+        # Apply transformation from GLS frame to pool frame
+        # First subtract translation offset and apply rotation
+        projected = rmat.dot(point - gls_origin)
 
-    rxry = np.array ( [
-        [cphi, 0, sphi],
-        [stheta*sphi, ctheta, -stheta*cphi],
-        [-ctheta*sphi, stheta, ctheta*cphi]
-        ] )
+        # Publish normalized data
+        (data.point.x, data.point.y, data.point.z) = (projected[0][0], projected[1][0], projected[2][0])
+        location_pub.publish(data) 
 
-    global rgrav
-    rgrav = np.transpose(rxry)
+# def handle_grav(data):
+#     grav_deq.append(data)
+#     grav_data = np.array([data.x, data.y, data.z])
+#     norm = np.linalg.norm(grav_data)
+
+#     phi = math.asin(data.x / norm)
+#     cphi = math.cos(phi)
+#     sphi = math.sin(phi)
+
+#     theta = math.atan2(data.y / (-data.x*cphi), data.z / (data.x*cphi))
+#     ctheta = math.cos(theta)
+#     stheta = math.sin(theta)
+
+#     rxry = np.array ( [
+#         [cphi, 0, sphi],
+#         [stheta*sphi, ctheta, -stheta*cphi],
+#         [-ctheta*sphi, stheta, ctheta*cphi]
+#         ] )
+
+#     global rgrav
+#     rgrav = np.transpose(rxry)
     
 def handle_imu(data):
     imu_deq.append(data)
@@ -140,11 +155,12 @@ def handle_mag(data):
 
     if calibrated:
 
-        global rgrav
-        data_vec = np.array([data.x, data.y, data.z])
-        data_vec_w = rgrav.dot(data_vec)
+        # global rgrav
+        # data_vec = np.array([data.x, data.y, data.z])
+        # data_vec_w = rgrav.dot(data_vec)
 
-        heading = math.atan2(data_vec_w[1], data_vec_w[0]) # [-pi, pi)
+        #heading = math.atan2(data_vec_w[1], data_vec_w[0]) # [-pi, pi)
+        heading = math.atan2(data.y, data.x)
         # if heading < 0:
             # heading += 2 * math.pi # [0, 2*pi)
         print("heading: %4f" % heading)
@@ -155,7 +171,7 @@ def handle_mag(data):
                 (imu_offset, heading, math.degrees(heading)))
 
         # heading *= -1
-        heading += 3 * 2 * math.pi
+        heading += 2 * math.pi
         heading %= 2 * math.pi
         if heading > math.pi:
             heading -= 2 * math.pi
@@ -166,25 +182,7 @@ def handle_mag(data):
 
         imu_data = Euler()
         imu_data.heading = heading
-        imu_pub.publish(imu_data)
-        
-
-def handle_waypoint(data):
-    # If calibrated, convert this reading into a calibrated one and republish.
-    if calibrated:
-        # Project uncalibrated location onto the pool plane
-        # http://stackoverflow.com/questions/9605556/how-to-project-a-3d-point-to-a-3d-plane
-        raw = np.array([data.point.x, data.point.y, data.point.z])
-        v = raw - pool_plane_origin
-        dist = np.dot(v, pool_plane_normal)
-        projected = raw - dist*pool_plane_normal
-
-        # Rotate data from pool plane to XY plane
-        final = rmat.dot(projected)
-
-        # Publish normalized data
-        (data.point.x,data.point.y,data.point.z) = (final[0],final[1],final[2])
-        waypoint_pub.publish(data)        
+        imu_pub.publish(imu_data)      
 
 def average(iterable):
     if iterable:
@@ -265,6 +263,7 @@ def handle_user_input():
                 location, avg_x, avg_y, avg_z,
                 avg_roll, avg_pitch, avg_heading,
                 avg_mag_x, avg_mag_y, avg_mag_z)
+        
         calibration_points.append(CalibrationPoint(avg_x, avg_y, avg_z,
             avg_roll, avg_pitch, avg_heading, avg_mag_x, avg_mag_y, avg_mag_z))
 
@@ -287,17 +286,14 @@ def handle_user_input():
     global rmat
     rmat = compute_projection(p0_gls, p1_gls, p2_gls)
 
-    # Compute rotation between GLS frame and pool frame
-    # v2 is from bottom left to bottom right - treat this as x axis
-    projected_v2 = project(v2)
-    projected_v2_norm = np.linalg.norm(projected_v2)
-
-    global imu_offset
+    # Compute IMU offset - reading at the first calibration point
     # imu_offset = calibration_points[0].heading # SIGNS HERE!
     # avg_mag_x = average([point.mag_x for point in calibration_points])
     # avg_mag_y = average([point.mag_y for point in calibration_points])
     mag_x = calibration_points[0].mag_x
     mag_y = calibration_points[0].mag_y
+
+    global imu_offset
     imu_offset = math.atan2(mag_y, mag_x) # range [-pi, pi)
     # if imu_offset < 0:
         # imu_offset += 2 * math.pi # range[0, 2*pi)
