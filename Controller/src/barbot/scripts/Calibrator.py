@@ -18,25 +18,16 @@ mag_deq = collections.deque(maxlen=10)
 grav_deq = collections.deque(maxlen=10)
 
 calibration_points = []
-calibrated = True
+calibrated = False
 
 gls_origin = None
 rmat = None
 
-frame_offset = 0.0
 imu_offset = 0
 
 gvec = np.array([0.0, 0.0, -1.0])
 grav_data = np.array([0.0, 0.0, -1.0])
 rgrav = np.array([[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]])
-
-def project(point):
-    v = point - pool_plane_origin
-    dist = np.dot(v, pool_plane_normal)
-    projected = point - dist * pool_plane_normal
-    final = rmat.dot(projected)
-    final[2] = 0
-    return final
 
 def compute_projection(p0, p1, p2):
     # Frame of physical pool
@@ -109,8 +100,7 @@ def handle_grav(data):
 
     global rgrav
     rgrav = np.transpose(rxry)
-
-
+    
 def handle_imu(data):
     imu_deq.append(data)
     
@@ -163,9 +153,6 @@ def handle_mag(data):
         # heading = (heading + 2 * math.pi) % (2 * math.pi) # [0, 2*pi)
         print("imu off: %4f, minus imu off: %4f, minus in deg: %d" %
                 (imu_offset, heading, math.degrees(heading)))
-
-        # heading -= frame_offset
-        # print("frame off: %4f, minus frame off: %4f" % (frame_offset, heading))
 
         # heading *= -1
         heading += 3 * 2 * math.pi
@@ -305,10 +292,6 @@ def handle_user_input():
     projected_v2 = project(v2)
     projected_v2_norm = np.linalg.norm(projected_v2)
 
-    global frame_offset
-    frame_offset = math.acos(np.dot(projected_v2, np.array([1.0, 0.0, 0.0])) / 
-            (projected_v2_norm)) # range [0, pi)
-
     global imu_offset
     # imu_offset = calibration_points[0].heading # SIGNS HERE!
     # avg_mag_x = average([point.mag_x for point in calibration_points])
@@ -320,7 +303,6 @@ def handle_user_input():
         # imu_offset += 2 * math.pi # range[0, 2*pi)
 
     rospy.loginfo("Heading offset: %f\n", imu_offset)
-    rospy.loginfo("Frame offset: %f\n", frame_offset)
 
     global calibrated
     calibrated = True
