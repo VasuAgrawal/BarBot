@@ -16,6 +16,7 @@ location_deq = collections.deque(maxlen=10)
 imu_deq = collections.deque(maxlen=10)
 mag_deq = collections.deque(maxlen=10)
 grav_deq = collections.deque(maxlen=10)
+waypoint_deq = collections.deque(maxlen=10)
 
 calibration_points = []
 calibrated = False
@@ -80,7 +81,7 @@ def handle_location(data):
         location_pub.publish(data)
 
 def handle_waypoint(data):
-    location_deq.append(data)
+    waypoint_deq.append(data)
 
     # If calibrated, convert this reading into a calibrated one and republish.
     if calibrated:
@@ -92,7 +93,7 @@ def handle_waypoint(data):
 
         # Publish normalized data
         (data.point.x, data.point.y, data.point.z) = (projected[0][0], projected[1][0], projected[2][0])
-        location_pub.publish(data) 
+        waypoint_pub.publish(data) 
 
 # def handle_grav(data):
 #     grav_deq.append(data)
@@ -312,6 +313,7 @@ if __name__ == "__main__":
     threading.Thread(target=handle_user_input).start()
     
     global location_pub
+    global waypoint_pub
     global imu_pub
     location_pub = rospy.Publisher("calibrated_location", PointStamped, 
             queue_size=1)
@@ -324,5 +326,5 @@ if __name__ == "__main__":
     rospy.Subscriber("raw_waypoint", PointStamped, handle_waypoint)
     rospy.Subscriber("imu_topic/Euler", Euler, handle_imu)
     rospy.Subscriber("imu_topic/Magnetometer", Vector3, handle_mag)
-    rospy.Subscriber("imu_topic/GravityAcceleration", Vector3, handle_grav)
+    # rospy.Subscriber("imu_topic/GravityAcceleration", Vector3, handle_grav)
     rospy.spin()
