@@ -12,7 +12,7 @@ class Robot(object):
         self.inTransit = False
         self.goal = None
         self.goalTime = None
-        self.waitTime = 10 # 10 seconds
+        self.waitTime = 4 # 10 seconds
 
     def getLocation(self, locations):
         locationMap = locations.locations

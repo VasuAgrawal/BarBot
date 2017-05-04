@@ -31,14 +31,10 @@ class Scheduler(tornado.tcpserver.TCPServer):
 
         self.http_client = httpclient.AsyncHTTPClient()
         self.destination = 'http://localhost:8080/scheduler/'
-       # self.destination = 'http://128.237.167.97:8080/scheduler/'
 
-        # TODO: update these with actual coordinates of the bar
-        self.barX = 0
-        self.barY = 0
-        self.barZ = 0
+        self.bartenderId = 10
         # TODO: pick a reasonable number here
-        self.thresh = .25 # acceptable distance from customer for drop offs
+        self.thresh = 1 # acceptable distance from customer for drop offs
         self.numRobots = 1
         self.robots = dict()
         for i in range(self.numRobots):
@@ -140,7 +136,13 @@ class Scheduler(tornado.tcpserver.TCPServer):
         robotDistances = dict()
         for robotId in self.robots:
             robot = self.robots[robotId]
-            robotDistances[robot.id] = robot.getTripDistance(self.barX, self.barY, self._loc)
+            if self.bartenderId in self._loc.locations:
+                position = self._loc.locations[self.bartenderId]
+                (barX, barY, barZ) = (position.x, position.y, position.z)
+            else:
+                (barX, barY, barZ) = (0,0,0)
+        
+            robotDistances[robot.id] = robot.getTripDistance(barX, barY, self._loc)
         return sorted(robotDistances.keys(), key=lambda robot: robotDistances[robot])
 
     # sort orders by distance to firstOrder
@@ -248,11 +250,17 @@ class Scheduler(tornado.tcpserver.TCPServer):
                     else:
                         robot.goalTime = None
                 else: # go back to the bar and refill
-                    if self.intersects(robot, self.barX, self.barY, self.barZ):
+                    if self.bartenderId in self._loc.locations:
+                        position = self._loc.locations[self.bartenderId]
+                        (barX, barY, barZ) (position.x, position.y, position.z)
+                    else:
+                        (barX, barY, barZ) = (0,0,0)
+        
+                    if self.intersects(robot, barX, barY, barZ):
                         robot.inTransit = False
                         robot.goal = None
                     else:
-                        robot.goal = (self.barX, self.barY, self.barZ)
+                        robot.goal = (barX, barY, barZ)
                 print(robot.goal)
 
     async def updateScheduler(self):
