@@ -8,7 +8,7 @@ import matplotlib
 import numpy as np
 
 class Controller(object):
-    def __init__(self, kp, ki, kd, speed=0.5, turn_speed=0.25, threshold=0.1,
+    def __init__(self, kp, ki, kd, speed=0.5, turn_speed=0.1875, threshold=0.1,
             theta_threshold=0.15,
         thruster_topic="thruster", waypoint_topic="calibrated_waypoint", state_topic="calibrated_state"):
 
@@ -212,6 +212,6 @@ class Controller(object):
 
 if __name__ == '__main__':
     rospy.init_node("controller")
-    controller = Controller(1., 0., 0.)
+    controller = Controller(.5, 0., 0.)
     controller.ui()
     rospy.spin()
