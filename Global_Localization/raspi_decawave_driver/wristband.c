@@ -24,6 +24,7 @@
 #include <string>
 #include <unistd.h>
 #include <sys/time.h>
+#include <math.h>
 
 #include <deca_device_api.h>
 #include <deca_regs.h>
@@ -241,6 +242,10 @@ int main(int argc, char *argv[]) {
     INFO_PRINT(("Beacon: Connected to server\n"));
 #endif // USING_SERVER
 
+    struct timespec spec;
+    long start_ms;
+    long end_ms;
+
     // Loop forever acting as a beacon
     while (1) {
         if (mode == INITIALIZATION) {
@@ -251,13 +256,18 @@ int main(int argc, char *argv[]) {
             INFO_PRINT(("Entered tracking mode\n"));
             deca_sleep(100 * (device_addr - NUM_BEACONS));
             while(1) {
+                clock_gettime(CLOCK_REALTIME, &spec);
+                start_ms = round(spec.tv_nsec / 1.0e6);
                 // Regularly ping the beacon network
                 for (uint8 target_addr = 0; target_addr < NUM_BEACONS; target_addr++) {
                     set_msg_addresses(device_addr, target_addr);
                     computeDistanceInit();
                     deca_sleep(RNG_DELAY_MS);
                 }
-                deca_sleep(500);
+                clock_gettime(CLOCK_REALTIME, &spec);
+                end_ms = round(spec.tv_nsec / 1.0e6);
+
+                deca_sleep(500 - (end_ms - start_ms));
             }
         }
     }
