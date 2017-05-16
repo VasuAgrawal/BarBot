@@ -37,9 +37,9 @@
 #include <sys/socket.h>
 #include <netdb.h>
 
+// Macros for output logging level
 //#define DEBUG 1
 #define INFO 1
-//#define USING_SERVER 1
 
 // Debug print macro
 #ifdef DEBUG
@@ -93,16 +93,15 @@
 #define POLL_TX_TO_RESP_RX_DLY_UUS 150
 #define RESP_RX_TO_FINAL_TX_DLY_UUS 8000
 #define RESP_RX_TIMEOUT_UUS 10000
-#define TDMA_DELAY 10
 
 // Distance regression information
 #define X_COEFF 0.962467985748344
 #define Y_INTERCEPT 0.0252350208688039
 
-// Handling initialization of beacons
+// Number of beacons in the system
 #define NUM_BEACONS 7
-#define NUM_MEASUREMENTS 10
-#define NUM_ROUNDS 5
+// Number of tags being localized in the system
+#define NUM_TAGS 2
 
 // Default communication configuration. We use here EVK1000's default mode (mode 3).
 static dwt_config_t config = {
@@ -156,19 +155,15 @@ static uint8 device_addr;
 typedef enum localization_mode {INITIALIZATION, TRACKING} localization_mode;
 static localization_mode mode;
 
-// Variables for handling initialization of network positions
-static bool is_master;
-static bool was_previous_master;
-static int rounds;
-
 // Server information
 static int serverfd;
 static std::string serverip = "192.168.1.108";
 static std::string serverport = "8888";
 
 // Function Declarations
-static int computeDistanceInit();
-static int computeDistanceResp();
+static int compute_distance_init();
+static int compute_distance_resp();
+void write_to_server(double distance, int send_id, int recv_id, bool beacon);
 static int connect_to_server(std::string addr, std::string port);
 static uint64 get_tx_timestamp_u64(void);
 static uint64 get_rx_timestamp_u64(void);
@@ -186,31 +181,23 @@ int main(int argc, char *argv[]) {
 	// Read command line arguments
 	if (argc != 2) {
 		printf("Usage: [ID: 0, 1, 2, etc.]\n");
-		return -1;
+		exit(EXIT_FAILURE);
 	}
 	else {
         // Set device address
         device_addr = atoi(argv[1]);
-
-        // Set master
-        if (device_addr == 0) {
-            is_master = true;
-        }
-        else {
-            is_master = false;
-        }
 	}
 
     // Mode starts in initialization
     mode = INITIALIZATION;
 
     // Start with board specific hardware init.
-    raspiDecawaveInit();
+    raspi_decawave_init();
 
     // Initialize
     if (dwt_initialise(DWT_LOADUCODE) == DWT_ERROR) {
         INFO_PRINT(("DWM1000: Initialization Failed!\n"));
-        exit(-1);
+        exit(EXIT_FAILURE);
     }
     INFO_PRINT(("DWM1000: Initialization Complete\n"));
     
@@ -228,20 +215,10 @@ int main(int argc, char *argv[]) {
     // Set up messages with appropriate IDs
     set_msg_addresses(0, device_addr);
 
-#ifdef USING_SERVER
-    // Attempt to connect to the server - retry every half second
-    while (1) {
-        if ((serverfd = connect_to_server(serverip, serverport)) < 0) {
-            std::cout << "Unable to connect to server at " << serverip << ":" << serverport << std::endl;
-            deca_sleep(500);
-        }
-        else {
-            break;
-        }
-    }
-    INFO_PRINT(("Beacon: Connected to server\n"));
-#endif // USING_SERVER
-
+    // Use time information to compute how long each message ping took. This
+    // allows us to properly calculate how much to delay the next transmission
+    // by, so variance in transmission time does not cause messages to overlap
+    // as time goes on.
     struct timespec spec;
     long start_ms;
     long end_ms;
@@ -250,7 +227,7 @@ int main(int argc, char *argv[]) {
     while (1) {
         if (mode == INITIALIZATION) {
         	// Wait for beacons to finish initializing
-            computeDistanceResp();
+            compute_distance_resp();
         }
         else if (mode == TRACKING) {
             INFO_PRINT(("Entered tracking mode\n"));
@@ -261,25 +238,30 @@ int main(int argc, char *argv[]) {
                 // Regularly ping the beacon network
                 for (uint8 target_addr = 0; target_addr < NUM_BEACONS; target_addr++) {
                     set_msg_addresses(device_addr, target_addr);
-                    computeDistanceInit();
+                    compute_distance_init();
                     deca_sleep(RNG_DELAY_MS);
                 }
                 clock_gettime(CLOCK_REALTIME, &spec);
                 end_ms = round(spec.tv_nsec / 1.0e6);
 
-                deca_sleep(500 - (end_ms - start_ms));
+                // Each round will take RNG_DELAY_MS * NUM_BEACONS
+                // We want to give each tag that much time to finish
+                deca_sleep(((RNG_DELAY_MS * NUM_BEACONS) * NUM_TAGS) - (end_ms - start_ms));
             }
         }
     }
 }
 
 /**
+ * @function compute_distance_init
+ *
  * Performs a ranging computation of the distance, from the initiating side.
  * Waits for acknowledgment that the exchange has completed before exiting this function.
  *
  * Returns 0 on success, -1 on failure.
  */
-static int computeDistanceInit() {
+static int compute_distance_init() 
+{
     dwt_setrxtimeout(RESP_RX_TIMEOUT_UUS);
     
     // Write frame data to DW1000 and prepare transmission.
@@ -307,7 +289,6 @@ static int computeDistanceInit() {
 
         // Validate the requested type of frame to process appropriately.
         if (validate_frame(rx_buffer, MSG_TYPE_RESP) == 0) {
-            DEBUG_PRINT(("Rx ack\n"));
             uint32 final_tx_time;
             int ret;
 
@@ -337,20 +318,14 @@ static int computeDistanceInit() {
                 // Poll DW1000 until TX frame sent event set.
                 while (!(dwt_read32bitreg(SYS_STATUS_ID) & SYS_STATUS_TXFRS));
 
-                DEBUG_PRINT(("Sent final\n"));
-
                 // Clear TXFRS event.
                 dwt_write32bitreg(SYS_STATUS_ID, SYS_STATUS_TXFRS);
 
                 return 0;
             }
-            else {
-                DEBUG_PRINT(("Delayed tx fail on final\n"));
-            }
         }
     }
     else {
-        DEBUG_PRINT(("timeout\n"));
         // Clear RX error/timeout events in the DW1000 status register.
         dwt_write32bitreg(SYS_STATUS_ID, SYS_STATUS_ALL_RX_TO | SYS_STATUS_ALL_RX_ERR);
 
@@ -362,14 +337,17 @@ static int computeDistanceInit() {
 }
 
 /**
+ * @function compute_distance_resp
+ *
  * Performs a ranging computation of the distance, from the receiving side.
  * Sends acknowledgment that the exchange has completed before exiting this function.
  *
  * Returns 0 on success, -1 on failure.
  */
-static int computeDistanceResp() {
+static int compute_distance_resp() 
+{
     // Clear reception timeout to start next ranging process.
-    dwt_setrxtimeout(0);
+    dwt_setrxtimeout(5*RESP_RX_TIMEOUT_UUS);
 
     // Activate reception immediately.
     dwt_rxenable(DWT_START_RX_IMMEDIATE);
@@ -389,16 +367,86 @@ static int computeDistanceResp() {
             dwt_readrxdata(rx_buffer, frame_len, 0);
         }
 
-        // Validate the requested type of frame to process appropriately. Wait for a mode switch
-        if (validate_frame(rx_buffer, MSG_TYPE_MODE_SWITCH) == 0) {
-            DEBUG_PRINT(("Rx mode switch\n"));
+        // Validate the requested type of frame to process appropriately.
+        if (validate_frame(rx_buffer, MSG_TYPE_POLL) == 0) {
+            int ret;
+
+            // Retrieve poll reception timestamp.
+            poll_rx_ts = get_rx_timestamp_u64();
+
+            // Write and send the response message.
+            tx_resp_msg[MSG_DEST_ADDR_IDX] = rx_buffer[MSG_SRC_ADDR_IDX];
+            tx_resp_msg[MSG_DEST_ADDR_IDX+1] = rx_buffer[MSG_SRC_ADDR_IDX];
+            dwt_writetxdata(sizeof(tx_resp_msg), tx_resp_msg, 0); // Zero offset in TX buffer.
+            dwt_writetxfctrl(sizeof(tx_resp_msg), 0, 1); // Zero offset in TX buffer, ranging.
+
+            //@TODO TDMA on beacon side, to respond in parallel to pings from tags
+            ret = dwt_starttx(DWT_START_TX_IMMEDIATE);
+
+            // If dwt_starttx() returns an error, abandon this ranging exchange and proceed to the next one.
+            if (ret == DWT_ERROR) {
+                INFO_PRINT(("Error transmitting response frame\n"));
+                return -1;
+            }
+
+            return 0;
+        }
+        // Check that the frame is a final message sent by "DS TWR initiator" example.
+        else if (validate_frame(rx_buffer, MSG_TYPE_FINAL) == 0) {
+            uint32 poll_tx_ts, resp_rx_ts, final_tx_ts;
+            uint32 poll_rx_ts_32, resp_tx_ts_32, final_rx_ts_32;
+            double Ra, Rb, Da, Db;
+            int64 tof_dtu;
+
+            // Retrieve response transmission and final reception timestamps.
+            resp_tx_ts = get_tx_timestamp_u64();
+            final_rx_ts = get_rx_timestamp_u64();
+
+            // Get timestamps embedded in the final message.
+            final_msg_get_ts(&rx_buffer[FINAL_MSG_POLL_TX_TS_IDX], &poll_tx_ts);
+            final_msg_get_ts(&rx_buffer[FINAL_MSG_RESP_RX_TS_IDX], &resp_rx_ts);
+            final_msg_get_ts(&rx_buffer[FINAL_MSG_FINAL_TX_TS_IDX], &final_tx_ts);
+            
+            // Compute time of flight. 32-bit subtractions give correct answers even if clock has wrapped.
+            poll_rx_ts_32 = (uint32)poll_rx_ts;
+            resp_tx_ts_32 = (uint32)resp_tx_ts;
+            final_rx_ts_32 = (uint32)final_rx_ts;
+            Ra = (double)(resp_rx_ts - poll_tx_ts);
+            Rb = (double)(final_rx_ts_32 - resp_tx_ts_32);
+            Da = (double)(final_tx_ts - resp_rx_ts);
+            Db = (double)(resp_tx_ts_32 - poll_rx_ts_32);
+            tof_dtu = (int64)((Ra * Rb - Da * Db) / (Ra + Rb + Da + Db));
+
+            tof = tof_dtu * DWT_TIME_UNITS;
+            distance = tof * SPEED_OF_LIGHT;
+
+            // Apply regression
+            distance = X_COEFF*distance + Y_INTERCEPT;
+
+#ifdef USING_SERVER
+            // Transmit distance to server
+            write_to_server(distance, device_addr,
+                            rx_buffer[MSG_SRC_ADDR_IDX], true);
+            // We must construct two symmetric packets if we are in tracking
+            // mode, as the server expects two packets, one marked as a beacon
+            // and the other not marked as a beacon.
+            // If we are in tracking mode, send the symmetric message.
+            if (mode == TRACKING) {
+                write_to_server(distance, device_addr,
+                                rx_buffer[MSG_SRC_ADDR_IDX], false);
+            }
+#endif // USING_SERVER
+
+            INFO_PRINT(("%3.2f\n", distance));
+            return 0;
+        }
+        else if (validate_frame(rx_buffer, MSG_TYPE_MODE_SWITCH) == 0) {
             // Switch to tracking mode
-            mode = TRACKING;
+            mode = TRACKING; 
             return 0;
         }
     }
     else {
-        DEBUG_PRINT(("Error/timeout\n"));
         // Clear RX error/timeout events in the DW1000 status register.
         dwt_write32bitreg(SYS_STATUS_ID, SYS_STATUS_ALL_RX_TO | SYS_STATUS_ALL_RX_ERR);
 
@@ -409,16 +457,56 @@ static int computeDistanceResp() {
     return -1;
 }
 
+void write_to_server(double distance, int send_id, int recv_id, bool beacon) 
+{
+    // Construct nanopb message
+    DwDistance distProto = DwDistance_init_default;
+    uint8_t buffer[DwDistance_size];
+    pb_ostream_t stream = pb_ostream_from_buffer(buffer, sizeof(buffer));
+
+    // Fill out fields in proto
+    distProto.dist = distance;
+    distProto.send_id = device_addr;
+    distProto.recv_id = rx_buffer[MSG_SRC_ADDR_IDX];
+    distProto.beacon = true;
+
+    // Serialize proto and encode size into header for sending to server
+    pb_encode(&stream, DwDistance_fields, &distProto);
+    uint32_t byte_size = stream.bytes_written;
+    uint8_t *bytes = new uint8_t[4 + byte_size];
+
+    // Little endian encoding of packet size
+    bytes[0] = (byte_size >> 0) & 0xFF;
+    bytes[1] = (byte_size >> 8) & 0xFF;
+    bytes[2] = (byte_size >> 16) & 0xFF;
+    bytes[3] = (byte_size >> 24) & 0xFF;
+
+    for (int i = 0; i < byte_size; i++) {
+        bytes[i+4] = buffer[i];
+    }
+
+    // Attempt to send the array over the socket
+    if (write(serverfd, bytes, 4 + byte_size) < 0) {
+        INFO_PRINT(("Error in writing to socket!\n"));
+    }
+
+    // Clean up
+    delete[] bytes;
+}
+
 /**
+ * @function connect_to_server
+ * 
  * Makes one attempt at connecting to the server at the given destination. A
  * failure is indicated with a negative number. Implement some try-again logic
  * above this if you want.
  */
-int connect_to_server(std::string addr, std::string port) {
+int connect_to_server(std::string addr, std::string port) 
+{
   struct addrinfo hints, *listp, *p;
   memset(&hints, 0, sizeof hints);
   hints.ai_family = AF_INET; // IPv4
-  hints.ai_socktype = SOCK_STREAM; // TCP?
+  hints.ai_socktype = SOCK_STREAM; // TCP
   hints.ai_flags = AI_NUMERICSERV;
   hints.ai_flags |= AI_ADDRCONFIG;
 
@@ -460,10 +548,13 @@ int connect_to_server(std::string addr, std::string port) {
 }
 
 /**
+ * @function get_tx_timestamp_u64
+ *
  * Get the TX timestamp in a 64-bit variable.
  * This function assumes that the length of timestamps is 40 bits, for both TX and RX
  */
-static uint64 get_tx_timestamp_u64(void) {
+static uint64 get_tx_timestamp_u64(void) 
+{
     uint8 ts_tab[5];
     uint64 ts = 0;
     int i;
@@ -476,10 +567,13 @@ static uint64 get_tx_timestamp_u64(void) {
 }
 
 /**
+ * @function get_rx_timestamp_u64
+ *
  * Get the RX timestamp in a 64-bit variable.
  * This function assumes that length of timestamps is 40 bits, for both TX and RX
  */
-static uint64 get_rx_timestamp_u64(void) {
+static uint64 get_rx_timestamp_u64(void) 
+{
     uint8 ts_tab[5];
     uint64 ts = 0;
     int i;
@@ -492,10 +586,13 @@ static uint64 get_rx_timestamp_u64(void) {
 }
 
 /**
+ * @function final_msg_set_tx
+ *
  * Fill a given timestamp field in the final message with the given value. In the timestamp fields of the final message,
  * the least significant byte is at the lower address.
  */
-static void final_msg_set_ts(uint8 *ts_field, uint64 ts) {
+static void final_msg_set_ts(uint8 *ts_field, uint64 ts) 
+{
     int i;
     for (i = 0; i < FINAL_MSG_TS_LEN; i++) {
         ts_field[i] = (uint8) ts;
@@ -504,10 +601,13 @@ static void final_msg_set_ts(uint8 *ts_field, uint64 ts) {
 }
 
 /**
+ * @function final_msg_get_ts
+ *
  * Fill a given timestamp field in the final message with the given value. In the timestamp fields of the final message,
  * the least significant byte is at the lower address.
  */
-static void final_msg_get_ts(const uint8 *ts_field, uint32 *ts) {
+static void final_msg_get_ts(const uint8 *ts_field, uint32 *ts) 
+{
     int i;
     *ts = 0;
     for (i = 0; i < FINAL_MSG_TS_LEN; i++) {
@@ -516,14 +616,20 @@ static void final_msg_get_ts(const uint8 *ts_field, uint32 *ts) {
 }
 
 /**
+ * @function switch_msg_set_sys_time
+ *
  * Fill the time fields in the switch message with the current system time.
+ *
+ * @TODO Implement a use for this to synchronize time between beacons and tags
  */
-static void switch_msg_set_sys_time() {
+static void switch_msg_set_sys_time() 
+{
     int i;
     struct timeval tv;
     gettimeofday(&tv, NULL);
 
-    INFO_PRINT(("Sending time of: %d sec, %d us\n", tv.tv_sec, tv.tv_usec));
+    INFO_PRINT(("Sending time of: %d sec, %d us\n", 
+                (int)tv.tv_sec, (int)tv.tv_usec));
 
     for (i = 0; i < 4; i++) {
         mode_switch_msg[SWITCH_MSG_TIME_SEC_IDX + i] = (uint8)tv.tv_sec;
@@ -535,9 +641,14 @@ static void switch_msg_set_sys_time() {
 }
 
 /**
+ * @function switch_msg_get_sys_time
+ *
  * Fill a given system time struct with the values from the message.
+ * 
+ * @TODO Implement a use for this to synchronize time between beacons and tags
  */
-static void switch_msg_get_sys_time(const uint8 *rx_buf, struct timeval *tv) {
+static void switch_msg_get_sys_time(const uint8 *rx_buf, struct timeval *tv) 
+{
     int i;
 
     tv->tv_sec = 0;
@@ -550,9 +661,12 @@ static void switch_msg_get_sys_time(const uint8 *rx_buf, struct timeval *tv) {
 }
 
 /**
+ * @function set_msg_addresses
+ *
  * Update the addreses of each message when we change targets
  */
-static void set_msg_addresses(uint8 master_addr, uint8 slave_addr) {
+static void set_msg_addresses(uint8 master_addr, uint8 slave_addr) 
+{
 	// Poll message addresses
 	tx_poll_msg[MSG_SRC_ADDR_IDX] = master_addr;
 	tx_poll_msg[MSG_SRC_ADDR_IDX+1] = master_addr;
@@ -594,9 +708,12 @@ static void set_msg_addresses(uint8 master_addr, uint8 slave_addr) {
 }
 
 /**
- * Validates the frame against the fixed parameters, as well as the expected type of frame
+ * @function validate_frame
+ * Validates the frame against the fixed parameters, as well as the expected 
+ * type of frame
  */
-static int validate_frame(uint8* frame, uint8 expected_type) {
+static int validate_frame(uint8* frame, uint8 expected_type) 
+{
 	// Validate frame control bytes
 	if ((frame[0] != 0x41) || (frame[1] != 0x88)) {
 		return -1;
@@ -613,12 +730,7 @@ static int validate_frame(uint8* frame, uint8 expected_type) {
     if (expected_type == MSG_TYPE_MODE_SWITCH) {
         return 0;
     }
-    // If we are in tracking mode, we don't care which device received messages are intended for.
-    // The only received messages should be init and final messages from the wristbands.
-    //if (mode == TRACKING) {
-    //    return 0;
-    //}
-	// Otherwise, Validate that message is intended for this device
+	// Validate that message is intended for this device
 	if ((frame[MSG_DEST_ADDR_IDX] != device_addr) || (frame[MSG_DEST_ADDR_IDX+1] != device_addr)) {
 		return -1;
 	}

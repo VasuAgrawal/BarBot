@@ -1,11 +1,11 @@
-/**
- * @file	deca_spi.c
- * @brief	SPI access functions
- *
- * Hardware-specific SPI access functions for the Raspberry Pi platform
- *
- * @author  Vivek Sridhar <vivek4830@gmail.com>
- */
+/*******************************************************************************
+ * @file	deca_spi.c                                                         *
+ * @brief	SPI access functions                                               *
+ *                                                                             *
+ * Hardware-specific SPI access functions for the Raspberry Pi platform        *
+ *                                                                             *
+ * @author  Vivek Sridhar <vivek4830@gmail.com>                                *
+ ******************************************************************************/
 
 #include <stdint.h>
 #include <pigpiod_if2.h>
@@ -14,15 +14,20 @@
 
 #include "deca_spi.h"
 
+// Chip select pin for SPI, change this based on hardware configuration
 #define DWM_SPI_CS          0
+
+// Frequency for SPI transactions
 #define DWM_SPI_FREQUENCY   500000
 
+// Handle for the SPI master object
 int spiHandle;
 
+// Handle for the Raspberry Pi - set up in the platform-specific config
 extern int piHandle;
 
 /**
- * @function openspi()
+ * @function openspi
  * @brief Initializes the Decawave SPI channel, default channel 0
  *
  * @return 0 on success, -1 on error
@@ -52,7 +57,7 @@ int closespi(void)
 }
 
 /**
- * @function int writetospi(uint16 headerLength, const uint8 *headerBuffer, uint32 bodyLength, const uint8 *bodyBuffer))
+ * @function int writetospi
  * @brief Abstraction for Decawave SPI write
  * @param headerLength  Number of bytes in header
  * @param headerBuffer  Buffer that stores the SPI transaction header
@@ -65,7 +70,8 @@ int closespi(void)
  * @return 0 on success, -1 on error
  */
 #pragma GCC optimize ("O3")
-int writetospi(uint16 headerLength, const uint8 *headerBuffer, uint32 bodyLength, const uint8 *bodyBuffer)
+int writetospi(uint16 headerLength, const uint8 *headerBuffer, 
+               uint32 bodyLength, const uint8 *bodyBuffer)
 {
     int i;
     
@@ -89,7 +95,7 @@ int writetospi(uint16 headerLength, const uint8 *headerBuffer, uint32 bodyLength
 }
 
 /**
- * @function int readfromspi(uint16 headerLength, const uint8 *headerBuffer, uint32 readLength, uint8 *readBuffer)
+ * @function int readfromspi
  * @brief Abstraction for Decawave SPI read
  * @param headerLength  Number of bytes in header
  * @param headerBuffer  Buffer that stores the SPI transaction header
@@ -102,7 +108,8 @@ int writetospi(uint16 headerLength, const uint8 *headerBuffer, uint32 bodyLength
  * @return Offset into read buffer where first byte may be found, or -1 on error
  */
 #pragma GCC optimize ("O3")
-int readfromspi(uint16 headerLength, const uint8 *headerBuffer, uint32 readLength, uint8 *readBuffer)
+int readfromspi(uint16 headerLength, const uint8 *headerBuffer, 
+                uint32 readLength, uint8 *readBuffer)
 {
     int i;
     

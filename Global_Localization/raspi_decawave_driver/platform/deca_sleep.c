@@ -1,22 +1,23 @@
-/*! ----------------------------------------------------------------------------
- * @file    deca_sleep.c
- * @brief   platform dependent sleep implementation
- *
- * @attention
- *
- * Copyright 2015 (c) DecaWave Ltd, Dublin, Ireland.
- *
- * All rights reserved.
- *
- * @author DecaWave
- */
+/*******************************************************************************
+ * @file    deca_sleep.c                                                       *
+ * @brief   Platform specific sleep implementation                             *
+ *                                                                             *
+ * This file contains the sleep implementation for the raspberry pi, which     *
+ * simply calls the unix sleep function.                                       *
+ *                                                                             *
+ * @author Vivek Sridhar <vivek4830@gmail.com>                                 *
+ ******************************************************************************/
 
 #include <unistd.h>
 
 #include "deca_device_api.h"
 
-/* Wrapper function to be used by decadriver. Declared in deca_device_api.h */
-void deca_sleep(unsigned int time_ms)
+/**
+ * @function deca_sleep
+ *
+ * Sleeps for the provdied number of milliseconds
+ */
+void deca_sleep(unsigned int time_ms) 
 {
     usleep(time_ms * 1000);
 }

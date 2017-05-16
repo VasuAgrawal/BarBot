@@ -10,13 +10,13 @@ PLATFORM=platform/raspi_init.c platform/deca_spi.c platform/deca_mutex.c platfor
 PROTO=../proto/dwdistance.pb.c
 NANOPB=../../Networking/proto/nanopb/pb_common.c ../../Networking/proto/nanopb/pb_encode.c
 
-#SRCS=$(wildcard *.c)
-SRCS=beacon.c
+SRCS=beacon.c wristband.c
 PROGS=$(patsubst %.c,%,$(SRCS))
 
 all: $(PROGS)
 
 %: %.c
+	@mkdir -p bin
 	$(CC) $< $(DECA) $(PLATFORM) $(PROTO) $(NANOPB) $(CFLAGS) -o bin/$@
 
 clean:

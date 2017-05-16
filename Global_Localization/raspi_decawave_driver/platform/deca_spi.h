@@ -1,15 +1,12 @@
-/*! ----------------------------------------------------------------------------
- * @file	deca_spi.h
- * @brief	SPI access functions
- *
- * @attention
- *
- * Copyright 2013 (c) DecaWave Ltd, Dublin, Ireland.
- *
- * All rights reserved.
- *
- * @author DecaWave
- */
+/*******************************************************************************
+ * @file    deca_spi.h                                                         *
+ * @brief   Platform-specific SPI functions                                    *
+ *                                                                             *
+ * The initialization of the functions that are called by our platform         *
+ * specific initialization routine.                                            * 
+ *                                                                             *
+ * @author Vivek Sridhar <vivek4830@gmail.com>                                 *
+ ******************************************************************************/
 
 #ifndef _DECA_SPI_H_
 #define _DECA_SPI_H_
@@ -20,23 +17,12 @@ extern "C" {
 
 #include "deca_types.h"
 
-#define DECA_MAX_SPI_HEADER_LENGTH      (3)                     // max number of bytes in header (for formating & sizing)
+// Max number of bytes in a message header
+#define DECA_MAX_SPI_HEADER_LENGTH (3)
 
-/*! ------------------------------------------------------------------------------------------------------------------
- * Function: openspi()
- *
- * Low level abstract function to open and initialise access to the SPI device.
- * returns 0 for success, or -1 for error
- */
-int openspi(void) ;
+int openspi(void);
 
-/*! ------------------------------------------------------------------------------------------------------------------
- * Function: closespi()
- *
- * Low level abstract function to close the the SPI device.
- * returns 0 for success, or -1 for error
- */
-int closespi(void) ;
+int closespi(void);
 
 #ifdef __cplusplus
 }
