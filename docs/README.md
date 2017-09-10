@@ -5,6 +5,9 @@ BarBot is the realization of the ultimate efficiency of resort pool bars – how
 
 BarBot solves multiple interesting challenges in robotics, including locomotion in water, as well as the mechanical challenge of stabilizing a drink on a moving aquatic platform. In addition, the task of localizing multiple robots and multiple patrons in an aquatic environment was a significant challenge, as the presence of water rules out most vision-based approaches. We hope our project has made significant progress towards realizing these challenges in modern robotics.
 
+## Results
+You can view the results and a demonstration of BarBot in [this video](https://www.youtube.com/watch?v=Wzp08hnF17Q&feature=youtu.be "BarBot Demo Video")!
+
 ## Requirements
 * __Navigation__ – BarBot must navigate the full service area of the pool. 
 * __Multiple BarBots__ – Multiple robots must work together to deliver drinks to patrons in the pool.
