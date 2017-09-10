@@ -19,23 +19,20 @@ BarBot solves multiple interesting challenges in robotics, including locomotion 
 * Electronics box sealed and enclosed inside robot.
 * Ballast - added approximately 40lbs to robot.
 
-![Chassis 1](/Physical1.jpg "Physical Robot 1")
-![Chassis 2](/Physical2.jpg "Physical Robot 2")
+<img src="/docs/Physical1.jpg" height="250"> <img src="/docs/Physical2.jpg" height="250">
 
 ## Drink Stabilization
 * Gimbal mechanism to stabilize a cup with a drink in it.
 * Passive stabilization - the weight of the drink was enough to stabilize the mechanism, even in rough waters and fast driving maneuvers. 
 
-![Gimbal 1](/Gimbal1.jpg "Gimbal 1")
-![Gimbal 2](/Gimbal2.jpg "Gimbal 2")
+<img src="/docs/Gimbal1.jpg" height="250"> <img src="/docs/Gimbal2.jpg" height="250">
 
 ## Ordering and Scheduling
 * Web app to place orders. Customers can place orders at tablets located around the pool.
 * Bartender interface to view which drinks to make and which robots to place them on.
 * Scheduler server plans for the robots using incoming orders. Depending on the capacity of each robot and the number of robots, it will schedule robots to deliver drinks. 
 
-![Ordering 1](/Ordering1.jpg "Ordering 1")
-![Ordering 2](/Ordering2.jpg "Ordering 2")
+<img src="/docs/Ordering1.jpg height="250"> <img src="/docs/Ordering2.jpg height="250">
 
 ## Localization
 * Beacon-based time-of-flight localization system using UWB radio frequencies.
@@ -44,9 +41,8 @@ BarBot solves multiple interesting challenges in robotics, including locomotion 
 * Each robot and patron in the pool has a wristband - perform triangulation to localize robots and patrons in the pool. 
 * Used a power-over-ethernet solution to ensure a robust beacon network.
 
-![Localization 1](/GLS1.jpg "Localization 1")
-![Localization 2](/GLS2.jpg "Localization 2")
-![Localization 3](/GLS3.jpg "Localization 3")
+<img src="/docs/GLS1.jpg" height="250"> <img src="/docs/GLS2.jpg" height="250">
+<img src="/docs/GLS3.jpg" height="250">
 
 For a more detailed look into our Global Localization System, please view the "Robust Multi-Agent Aquatic Localization.pdf" file in the top-level directory of the Github repository. 
 
@@ -55,7 +51,7 @@ For a more detailed look into our Global Localization System, please view the "R
 * Robust to node failure - all nodes automatically reconnect to each other upon connection loss.
 * Each robot is running an identical ROS workspace, with the only difference being a robot ID parameter.
 
-![Software Architecture](/SoftwareArch.jpg "Software Architecture")
+![Software Architecture](/docs/SoftwareArch.jpg "Software Architecture")
 
 ## Sensing and State Estimation
 * IMU provides heading of robot calculated from magnetometer readings as deviation from Earth North.
