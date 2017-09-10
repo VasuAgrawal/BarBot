@@ -19,7 +19,7 @@ BarBot solves multiple interesting challenges in robotics, including locomotion 
 * Electronics box sealed and enclosed inside robot.
 * Ballast - added approximately 40lbs to robot.
 
-<img src="/Physical1.jpg" height="250"> <img src="/Physical2.jpg" height="250">
+<img src="/docs/Physical1.jpg" height="250"> <img src="docs/Physical2.jpg" height="250">
 
 ## Drink Stabilization
 * Gimbal mechanism to stabilize a cup with a drink in it.
