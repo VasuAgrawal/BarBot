@@ -8,6 +8,8 @@ BarBot solves multiple interesting challenges in robotics, including locomotion 
 ## Results
 You can view the results and a demonstration of BarBot in [this video](https://www.youtube.com/watch?v=Wzp08hnF17Q&feature=youtu.be "BarBot Demo Video")!
 
+<img src="IntroImage.jpg" height="600">
+
 ## Requirements
 * __Navigation__ – BarBot must navigate the full service area of the pool. 
 * __Multiple BarBots__ – Multiple robots must work together to deliver drinks to patrons in the pool.
